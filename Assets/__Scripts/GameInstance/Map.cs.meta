@@ -1,0 +1,21 @@
+fileFormatVersion: 2
+guid: ab85c37bf03c4144ea3d711047a9c924
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - tilePrefab: {fileID: 8724686418215222672, guid: ad01ddd6eaae3cc45b8cab045ea30c10,
+      type: 3}
+  - probabiltiyPrefab: {fileID: 8481356092090465496, guid: 4952ad26978a84742bcfb4ca5610dac0,
+      type: 3}
+  - openSpotPrefab: {fileID: 2292040152810982304, guid: 2707da71a1fcc6a428dd69d33b6c858b,
+      type: 3}
+  - layoutJSON: {instanceID: 0}
+  - layout: {instanceID: 0}
+  - tilesAnchor: {instanceID: 0}
+  - freeVertexesAnchor: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
