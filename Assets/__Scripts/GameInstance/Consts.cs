@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 
-public enum eBuilding { None, Road, Settlement, City, Wall, Knight, UpgradeKnight, ActivateKnight, UpgradeCity, Knight2, Knight3, Destroy}
+public enum eBuilding { None, Road, Settlement, City, Wall, Knight, UpgradeKnight, ActivateKnight, ImproveCity, Knight2, Knight3, Destroy, TakeImprovedCity }
 public enum eResources { Brick, Ore, Wheat, Wood, Wool, Desert = 100};
 public enum eCommodity { None, Coin=5, Paper, Silk };
 public enum eKnightActions { None, TakeAction, Move, MoveRobber, MoveKnight};
@@ -39,6 +39,9 @@ public enum RaiseEventsCode
     FinishMoveKnight,
     CheckIfCanLoseCity,
     LoseCity,
+    ImproveCity,
+    SetImproveCityID,
+    TakeImproveCity,
 
 
     // TurnManager
@@ -51,6 +54,9 @@ public enum RaiseEventsCode
     LoseCard,
     TakeCard,
     CompleteTrade,
+
+    // City
+    LoseImproveCity,
 
 
 }
@@ -74,6 +80,14 @@ public class Consts
         {eResources.Wheat, new Color32(255, 228, 0, 255)},
         {eResources.Wool, new Color32(40, 255, 16, 255)},
         {eResources.Desert, new Color32(195, 154, 35, 255)}};
+
+    public const string CoinDevelopment = "CoinDevelopment";
+    public const string PaperDevelopment = "PaperDevelopment";
+    public const string SilkDevelopment = "SilkDevelopment";
+
+    public static Color32 CoinDevelopmentColor { get; } = new Color32(1, 39, 255,255);
+    public static Color32 PaperDevelopmentColor { get; } = new Color32(54, 166, 0,255);
+    public static Color32 SilkDevelopmentColor { get; } = new Color32(255, 250, 8,255);
 
     #endregion
 

@@ -71,7 +71,7 @@ public class GamePiece : MonoBehaviourPun
     // Update is called once per frame
     void Update()
     {
-        
+        Drop();
     }
 
 

@@ -76,8 +76,10 @@ public class Dice : MonoBehaviourPun
         }
         else
         {
-            turnManager.GiveControl();
-            Utils.RaiseEventForAll(RaiseEventsCode.SevenRolled);
+            // UNCOMMENT TO ENABLE ROBBER!
+
+            //turnManager.GiveControl();
+            //Utils.RaiseEventForAll(RaiseEventsCode.SevenRolled);
         }
     }
 

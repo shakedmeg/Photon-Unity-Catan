@@ -88,6 +88,7 @@
      <Compile Include="Assets\__Scripts\OfferPanel.cs" />
      <Compile Include="Assets\__Scripts\Pieces\Card.cs" />
      <Compile Include="Assets\__Scripts\Pieces\City.cs" />
+     <Compile Include="Assets\__Scripts\Pieces\CityImprovement.cs" />
      <Compile Include="Assets\__Scripts\Pieces\CommodityCard.cs" />
      <Compile Include="Assets\__Scripts\Pieces\Edge.cs" />
      <Compile Include="Assets\__Scripts\Pieces\GamePiece.cs" />

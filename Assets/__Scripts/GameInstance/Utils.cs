@@ -20,6 +20,15 @@ public class Utils : MonoBehaviour
                 return Color.white;
             case Consts.BLACK:
                 return Color.black;
+            case Consts.CoinDevelopment:
+                Debug.LogFormat("Return here {0}", Consts.CoinDevelopmentColor);
+                return Consts.CoinDevelopmentColor;
+            case Consts.PaperDevelopment:
+                Debug.LogFormat("Return here {0}", Consts.CoinDevelopmentColor);
+                return Consts.PaperDevelopmentColor;
+            case Consts.SilkDevelopment:
+                Debug.LogFormat("Return here {0}", Consts.CoinDevelopmentColor);
+                return Consts.SilkDevelopmentColor;
         }
         return Color.clear;
     }
@@ -98,11 +107,11 @@ public class Utils : MonoBehaviour
         switch (commodity)
         {
             case eCommodity.Paper:
-                return Consts.Paper;
+                return Consts.PaperDevelopment;
             case eCommodity.Coin:
-                return Consts.Coin;
+                return Consts.CoinDevelopment;
             case eCommodity.Silk:
-                return Consts.Silk;
+                return Consts.SilkDevelopment;
             default:
                 return "";
 
@@ -137,6 +146,22 @@ public class Utils : MonoBehaviour
         PhotonNetwork.RaiseEvent((byte)code, data, raiseEventOptions, sendOptions);
     }
     
+
+    public static void RaiseEventForMaster(RaiseEventsCode code, object[] data = null)
+    {
+        RaiseEventOptions raiseEventOptions = new RaiseEventOptions
+        {
+            Receivers = ReceiverGroup.MasterClient,
+            CachingOption = EventCaching.AddToRoomCache
+        };
+
+        SendOptions sendOptions = new SendOptions
+        {
+            Reliability = false
+        };
+
+        PhotonNetwork.RaiseEvent((byte)code, data, raiseEventOptions, sendOptions);
+    }
 
     public static void RaiseEventForGroup(RaiseEventsCode code, int[] actors, object[] data = null)
     {

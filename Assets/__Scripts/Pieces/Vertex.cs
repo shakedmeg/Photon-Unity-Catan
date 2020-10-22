@@ -37,8 +37,6 @@ public class Vertex : MonoBehaviourPun
 
     private Wall wall;
 
-    public bool UpgradedCity { get; internal set; } = false;
-
 
     private Vector3 p0;
     private Vector3 p1;
@@ -120,6 +118,7 @@ public class Vertex : MonoBehaviourPun
                 }
                 else
                     BuildCity();
+                buildManager.cityCount += 1;
                 turnManager.barbarians.photonView.RPC("BuildCity", RpcTarget.AllBufferedViaServer);
                 break;
 
@@ -240,6 +239,7 @@ public class Vertex : MonoBehaviourPun
         Building = eBuilding.Settlement;
         city = null;
         buildManager.Build = eBuilding.None;
+        buildManager.cityCount -= 1;
         turnManager.barbarians.photonView.RPC("CityDestroyed", RpcTarget.AllBufferedViaServer, PhotonNetwork.LocalPlayer.ActorNumber);
     }
 

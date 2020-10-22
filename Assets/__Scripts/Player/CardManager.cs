@@ -6,6 +6,7 @@ using Photon.Realtime;
 using ExitGames.Client.Photon;
 using System.Linq;
 using UnityEngine.UI;
+using UnityEngine.PlayerLoop;
 
 public class CardManager : MonoBehaviourPunCallbacks
 {
@@ -17,6 +18,7 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     #region Panels
     public GameObject buttonsPanel;
+    public List<Text> improveButtons;
 
 
     public GameObject resourceCardsPanel;
@@ -29,6 +31,7 @@ public class CardManager : MonoBehaviourPunCallbacks
     public GameObject selectPlayerPanel;
 
     public GameObject tradePanel;
+    public List<Text> portTexts;
 
     public GameObject tradeGivePanel;
     public GameObject tradeGetPanel;
@@ -264,12 +267,19 @@ public class CardManager : MonoBehaviourPunCallbacks
     public void ImproveCity(int commodityNum)
     {
         eCommodity commodity = (eCommodity)commodityNum;
-        if(commodityCount[commodity] >= commodityPrices[commodity])
+        if (buildManager.cityCount == 0 || commodityCount[commodity] < commodityPrices[commodity] || commodityPrices[commodity] == 6) return;
+        
+        int unimprovedCitiesCount = buildManager.CountUnimprovedCities();
+        bool canImproveCity = commodityPrices[commodity] >= 4 && unimprovedCitiesCount != 0;
+        
+        if (canImproveCity|| commodityPrices[commodity] < 4)
         {
             for(int i=0; i< commodityPrices[commodity]; i++)
-            {
                 RemoveCardFromHandByType(commodityNum);
-            }
+            
+
+            improveButtons[commodityNum - 5].text = string.Format("Level: {0}", commodityPrices[commodity].ToString());
+            
             commodityPrices[commodity] += 1;
             switch (commodityPrices[commodity])
             {
@@ -277,10 +287,10 @@ public class CardManager : MonoBehaviourPunCallbacks
                     OpenPerk(commodity);
                     break;
                 case 5:
-                    Utils.RaiseEventForAll(RaiseEventsCode.CheckImporveCity, new object[] { commodityNum });
+                    Utils.RaiseEventForMaster(RaiseEventsCode.CheckImporveCity, new object[] { commodityNum, 4 });
                     break;
                 case 6:
-                    Utils.RaiseEventForAll(RaiseEventsCode.CheckImporveCity, new object[] { commodityNum });
+                    Utils.RaiseEventForMaster(RaiseEventsCode.CheckImporveCity, new object[] { commodityNum, 5 });
                     break;
             }
         }
@@ -300,6 +310,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                 break;
             case eCommodity.Silk:
                 commodityPort = ePorts.p2To1;
+                UpdateCommodityPortsText();
                 break;
         }
     }
@@ -329,6 +340,32 @@ public class CardManager : MonoBehaviourPunCallbacks
     }
 
     #endregion
+
+
+    #region Port Text Related
+
+    public void UpdateCommodityPortsText()
+    {
+
+        for(int i = 5; i<8; i++)
+        {
+            UpdatePortText(i, "2 : 1");
+        }
+    }
+
+    public void UpdatePortText(int port, string portText)
+    {
+        if (port == 1)
+            portTexts[3].text = portText;
+        else if (port == 3)
+            portTexts[1].text = portText;
+        else
+            portTexts[port].text = portText;
+
+    }
+
+    #endregion
+
 
     #region Throw Related
     public void Thorw()

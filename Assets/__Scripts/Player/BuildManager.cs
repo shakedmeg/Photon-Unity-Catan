@@ -71,6 +71,8 @@ public class BuildManager : MonoBehaviourPun
     public Dictionary<int, Vertex> FreeKnights { get; private set; } = new Dictionary<int, Vertex>();
 
     public Dictionary<int, Vertex> PlayerBuildings { get; private set; } = new Dictionary<int, Vertex>();
+    public int cityCount = 0;
+
     public Dictionary<int, Edge> PlayerRoads { get; private set; } = new Dictionary<int, Edge>();
     public Dictionary<int, Vertex> PlayerKnights { get; private set; } = new Dictionary<int, Vertex>();
 
@@ -78,8 +80,16 @@ public class BuildManager : MonoBehaviourPun
     public Dictionary<int, Vertex> RivalsBuildingVertexes { get; private set; } = new Dictionary<int, Vertex>();
     public Dictionary<int, Vertex> RivalsKnights { get; private set; } = new Dictionary<int, Vertex>();
 
+    public Dictionary<eCommodity, int> improveCityViewID = new Dictionary<eCommodity, int>() 
+    {
+        { eCommodity.Coin, -1 },
+        { eCommodity.Paper, -1 },
+        { eCommodity.Silk, -1 },
+    };
+
 
     private Dictionary<string, List<Tile>> probNumberTile = new Dictionary<string, List<Tile>>();
+
 
 
     public Knight knightToMove;
@@ -90,7 +100,7 @@ public class BuildManager : MonoBehaviourPun
     public int displacedKnightPervId;
 
 
-    public List<Vertex> possibleCitiesToLose = new List<Vertex>();
+    public List<Vertex> regularCities = new List<Vertex>();
 
     #endregion
 
@@ -101,7 +111,7 @@ public class BuildManager : MonoBehaviourPun
     public eBuilding Build { get; set; }
     public eKnightActions KnightAction { get; set; }
 
-
+    public eCommodity ImproveCommodity { get; set; }
     #endregion
 
 
@@ -133,11 +143,6 @@ public class BuildManager : MonoBehaviourPun
     }
 
 
-
-    #endregion
-
-
-    #region Send Events
 
     #endregion
 
@@ -202,13 +207,31 @@ public class BuildManager : MonoBehaviourPun
                 break;
             case (byte)RaiseEventsCode.CheckIfCanLoseCity:
                 if (!photonView.IsMine) return;
-                turnManager.barbarians.photonView.RPC("ContinueLostCheck", RpcTarget.MasterClient, CheckIfLoseCity());
+                turnManager.barbarians.photonView.RPC("ContinueLostCheck", RpcTarget.MasterClient, CountUnimprovedCities() != 0);
                 break;
             case (byte)RaiseEventsCode.LoseCity:
                 if (!photonView.IsMine) return;
                 Build = eBuilding.Destroy;
-                foreach (Vertex vertex in possibleCitiesToLose)
+                foreach (Vertex vertex in regularCities)
                     vertex.City.InitScaleUpDown(Consts.CityRegularScale, Consts.ScaleCity);
+                break;
+            case (byte)RaiseEventsCode.ImproveCity:
+                data = (object[])photonEvent.CustomData;
+                Build = eBuilding.ImproveCity;
+                ImproveCommodity = (eCommodity)data[0];
+                foreach (Vertex vertex in regularCities)
+                    vertex.City.InitScaleUpDown(Consts.CityRegularScale, Consts.ScaleCity);
+                break;
+            case (byte)RaiseEventsCode.TakeImproveCity:
+                data = (object[])photonEvent.CustomData;
+                Build = eBuilding.TakeImprovedCity;
+                ImproveCommodity = (eCommodity)data[0];
+                foreach (Vertex vertex in regularCities)
+                    vertex.City.InitScaleUpDown(Consts.CityRegularScale, Consts.ScaleCity);
+                break;
+            case (byte)RaiseEventsCode.SetImproveCityID:
+                data = (object[])photonEvent.CustomData;
+                SetImprovementViewID((eCommodity)data[0], (int)data[1]);
                 break;
         }
 
@@ -398,6 +421,12 @@ public class BuildManager : MonoBehaviourPun
         }
     }
 
+
+    public void SetImprovementViewID(eCommodity commodityType, int viewID)
+    {
+        improveCityViewID[commodityType] = viewID;
+    }
+
     #endregion
 
 
@@ -433,12 +462,6 @@ public class BuildManager : MonoBehaviourPun
             if (FreeKnights.ContainsKey(vertexID)) FreeKnights[vertexID].gameObject.SetActive(false);
         }
     }
-
-    //public void PassSetupTurn()
-    //{
-    //    turnManager.PassTurn();
-    //}
-
 
     public void PreSetupRoad(int[] roads)
     {
@@ -585,7 +608,6 @@ public class BuildManager : MonoBehaviourPun
 
     public void ButtonHandler(int buildOption)
     {
-        Debug.Log("Got Pressed " + buildOption);
         if(Build != eBuilding.None)
         {
             int oldBuild = (int)Build - 1;
@@ -729,7 +751,7 @@ public class BuildManager : MonoBehaviourPun
         foreach (KeyValuePair<int, Vertex> entry in PlayerKnights)
         {
             Knight knight = entry.Value.knight;
-            if (entry.Value.Building == eBuilding.Knight || entry.Value.Building == eBuilding.Knight2)
+            if (entry.Value.Building == eBuilding.Knight || ( entry.Value.Building == eBuilding.Knight2 && CanBuildKnightsLvl3))
             {
 
                 knight.InitScaleUpDown(knight.transform.localScale, Consts.ScaleKnight);
@@ -818,18 +840,21 @@ public class BuildManager : MonoBehaviourPun
 
 
 
-    #region Barbarians Attack
-    private bool CheckIfLoseCity()
+    #region Barbarians Attack And City Improvements
+   
+    
+    public int CountUnimprovedCities()
     {
+        regularCities.Clear();
         foreach(Vertex vertex in PlayerBuildings.Values)
         {
             if(vertex.Building == eBuilding.City)
             {
-                if (!vertex.UpgradedCity)
-                    possibleCitiesToLose.Add(vertex);
+                if (!vertex.City.Improved)
+                    regularCities.Add(vertex);
             }
         }
-        return possibleCitiesToLose.Count != 0;
+        return regularCities.Count;
     }
     #endregion
 
@@ -842,6 +867,8 @@ public class BuildManager : MonoBehaviourPun
     {
         KnightAction = action;
     }
+
+
 
     #endregion
 

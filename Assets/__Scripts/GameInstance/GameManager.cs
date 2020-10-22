@@ -1,4 +1,5 @@
-﻿using ExitGames.Client.Photon;
+﻿using System.Collections.Generic;
+using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
@@ -23,6 +24,12 @@ public class GameManager : MonoBehaviourPun
     private int preGameCounter = 0;
     private int gameCounter;
 
+    private Dictionary<eCommodity, int[]> cityImprovementHolder = new Dictionary<eCommodity, int[]>()
+    {
+        { eCommodity.Coin, new int[]{-1, 4} },
+        { eCommodity.Paper, new int[]{-1, 4} },
+        { eCommodity.Silk, new int[]{-1, 4} },
+    };
 
     public int CurrentPlayer { get { return currentPlayer; } }
 
@@ -115,7 +122,6 @@ public class GameManager : MonoBehaviourPun
                 }
                 break;
             case (byte)RaiseEventsCode.FinishedThrowing:
-                //Debug.LogFormat("Current Player = {0}, Sender = {1}, Finished Throwing: {2} {3} {4}", CurrentPlayer, photonEvent.Sender, finishedThrowing[0], finishedThrowing[1], finishedThrowing[2]);
                 finishedThrowing[photonEvent.Sender - 1] = true;
                 foreach (bool finish in finishedThrowing)
                 {
@@ -123,8 +129,29 @@ public class GameManager : MonoBehaviourPun
                 }
                 if (PhotonNetwork.LocalPlayer.ActorNumber == photonEvent.Sender)
                 {
-                    //Debug.LogFormat("{0} got here", PhotonNetwork.LocalPlayer.ActorNumber);
                     Utils.RaiseEventForPlayer(RaiseEventsCode.FinishRollSeven, currentPlayer);
+                }
+                break;
+            case (byte)RaiseEventsCode.CheckImporveCity:
+                data = (object[])photonEvent.CustomData;
+                eCommodity commodity = (eCommodity)data[0];
+                int improvementLevel = (int)data[1];
+                if(cityImprovementHolder[commodity][0] == photonEvent.Sender)
+                {
+                    cityImprovementHolder[commodity][1] = improvementLevel;
+                    return;
+                }
+                else if (cityImprovementHolder[commodity][0] == -1)
+                {
+                    cityImprovementHolder[commodity][0] = photonEvent.Sender;
+                    Utils.RaiseEventForPlayer(RaiseEventsCode.ImproveCity, photonEvent.Sender, new object[] { data[0] });
+                }
+                else if(cityImprovementHolder[commodity][1] < improvementLevel)
+                {
+                    cityImprovementHolder[commodity][0] = photonEvent.Sender;
+                    cityImprovementHolder[commodity][1] = improvementLevel;
+                    Utils.RaiseEventForPlayer(RaiseEventsCode.TakeImproveCity, photonEvent.Sender, new object[] { data[0] });
+                    Utils.RaiseEventForPlayer(RaiseEventsCode.LoseImproveCity, photonEvent.Sender, new object[] { data[0] });
                 }
                 break;
         }

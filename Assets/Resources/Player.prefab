@@ -3155,12 +3155,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 7847062654661802440}
-        m_MethodName: AllowBuild
+        m_MethodName: ImproveCity
         m_Mode: 3
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 7
+          m_IntArgument: 6
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0
@@ -3460,10 +3460,11 @@ MonoBehaviour:
   - {fileID: 8659430929377841166}
   cancelButton: {fileID: 5909652222194763588}
   tiles: []
+  cityCount: 0
   knightToMove: {fileID: 0}
   notifyToPlayer: 0
   displacedKnightPervId: 0
-  possibleCitiesToLose: []
+  regularCities: []
 --- !u!114 &5009071044793883684
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3493,12 +3494,25 @@ MonoBehaviour:
   state: 0
   robber: {fileID: 0}
   buttonsPanel: {fileID: 311007879224358828}
+  improveButtons:
+  - {fileID: 1533979490726366315}
+  - {fileID: 564923508255477997}
+  - {fileID: 3036234743426497247}
   resourceCardsPanel: {fileID: 311007879008688591}
   commodityCardsPanel: {fileID: 4975085314929559498}
   throwCardsPanel: {fileID: 2145404747}
   throwCardsContent: {fileID: 1533696924}
   selectPlayerPanel: {fileID: 3705284940791711018}
   tradePanel: {fileID: 3498125498758438299}
+  portTexts:
+  - {fileID: 2050181597905612004}
+  - {fileID: 8859748203462109979}
+  - {fileID: 8944409808879130165}
+  - {fileID: 494622720292459813}
+  - {fileID: 8251929829216322172}
+  - {fileID: 5840267098435060026}
+  - {fileID: 4166068300187197714}
+  - {fileID: 2932168292971069971}
   tradeGivePanel: {fileID: 7268589922739093445}
   tradeGetPanel: {fileID: 6860925120450920106}
   bankButton: {fileID: 747711217403664822}
@@ -3648,12 +3662,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 7847062654661802440}
-        m_MethodName: AllowBuild
+        m_MethodName: ImproveCity
         m_Mode: 3
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 8
+          m_IntArgument: 5
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0
@@ -6834,7 +6848,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.98213, b: 0.033018887, a: 1}
+  m_Color: {r: 1, g: 0.98039216, b: 0.031372547, a: 1}
   m_RaycastTarget: 1
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -6894,12 +6908,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 7847062654661802440}
-        m_MethodName: AllowBuild
+        m_MethodName: ImproveCity
         m_Mode: 3
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 9
+          m_IntArgument: 7
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0
