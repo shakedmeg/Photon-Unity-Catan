@@ -154,6 +154,9 @@ public class GameManager : MonoBehaviourPun
                     Utils.RaiseEventForPlayer(RaiseEventsCode.LoseImproveCity, photonEvent.Sender, new object[] { data[0] });
                 }
                 break;
+            case (byte)RaiseEventsCode.ActivateRobber:
+                state = GameState.Playing;
+                break;
         }
 
     }

@@ -4,7 +4,7 @@ using UnityEngine;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
 using Photon.Pun;
-public class Utils : MonoBehaviour
+public class Utils
 {
     public static Color Name_To_Color(string name)
     {

@@ -76,7 +76,7 @@ public class TurnManager : MonoBehaviourPun
                 break;
             case (byte)RaiseEventsCode.StartTurn:
                 if (!photonView.IsMine) return;
-                StartTurn();
+                Dice.SetCollider(true);
                 break;
             case (byte)RaiseEventsCode.ActivateBarbarians:
                 if (!photonView.IsMine) return;
@@ -94,10 +94,9 @@ public class TurnManager : MonoBehaviourPun
     }
 
 
-    public void StartTurn()
+    public void GainControl()
     {
         if (!photonView.IsMine) return;
-        Dice.SetCollider(true);
         ButtonsPanel.gameObject.SetActive(true);
         endTurnButton.gameObject.SetActive(true);
         SetKnightsCollider(true);
@@ -120,16 +119,10 @@ public class TurnManager : MonoBehaviourPun
     }
 
 
-    public void GiveControl()
+    public void SetButtonsAndKnightsControl(bool flag)
     {
-        SetButtons(false);
-        SetKnightsCollider(false);
-    }
-
-    public void RegainControl()
-    {
-        SetButtons(true);
-        SetKnightsCollider(true);
+        SetButtons(flag);
+        SetKnightsCollider(flag);
     }
 
 

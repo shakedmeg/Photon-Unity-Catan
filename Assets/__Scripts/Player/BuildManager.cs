@@ -170,7 +170,7 @@ public class BuildManager : MonoBehaviourPun
                 break;
             case (byte)RaiseEventsCode.MatchTilesToDice:
                 data = (object[])photonEvent.CustomData;
-                GetTilesWithDiceNumber((string)data[0]);
+                GetTilesWithDiceNumber((string)data[0], true);
                 break;
             case (byte)RaiseEventsCode.UpdateVertexes:
                 data = (object[])photonEvent.CustomData;
@@ -200,7 +200,7 @@ public class BuildManager : MonoBehaviourPun
                 break;
             case (byte)RaiseEventsCode.FinishMoveKnight:
                 if (!photonView.IsMine) return;
-                turnManager.RegainControl();
+                turnManager.SetButtonsAndKnightsControl(true);
                 data = (object[])photonEvent.CustomData;
                 if (FreeVertexes.ContainsKey((int)data[0])) FreeVertexes[(int)data[0]].MoveKnight();
                 if (FreeKnights.ContainsKey((int)data[0])) FreeKnights[(int)data[0]].MoveKnight();
@@ -232,6 +232,10 @@ public class BuildManager : MonoBehaviourPun
             case (byte)RaiseEventsCode.SetImproveCityID:
                 data = (object[])photonEvent.CustomData;
                 SetImprovementViewID((eCommodity)data[0], (int)data[1]);
+                break;
+            case (byte)RaiseEventsCode.CheckIfNeedToPick:
+                data = (object[])photonEvent.CustomData;
+                GetTilesWithDiceNumber((string)data[0], false);
                 break;
         }
 
@@ -390,34 +394,32 @@ public class BuildManager : MonoBehaviourPun
         }
     }
 
-    public void GetTilesWithDiceNumber(string number)
+    /// <summary>
+    /// Compares the tiles probabilities to the rolled number, probabilty with robber on it will be skipped
+    /// </summary>
+    /// <param name="number"> The number the dice had rolled</param>
+    /// <param name="toHand"> If true will add the cards strighat to the hand, if false it will cache them in the card manager class</param>
+    public void GetTilesWithDiceNumber(string number, bool toHand)
     {
         if (!photonView.IsMine) return;
+        cardManager.cachedRollCards.Clear();
         foreach (Tile tile in probNumberTile[number])
         {
-            if (tile.RobberOn) continue;
-            if (tile.Resource != eResources.Desert)
+            if (tile.RobberOn || tile.Resource == eResources.Desert) continue;
+            foreach (int vertex in tile.Vertexes)
             {
-                foreach (int vertex in tile.Vertexes)
+                if (PlayerBuildings.ContainsKey(vertex))
                 {
-                    if (PlayerBuildings.ContainsKey(vertex))
-                    {
-                        int resource = (int)tile.Resource;
-                        cardManager.InitCard(resource);
-                        if (PlayerBuildings[vertex].Building == eBuilding.City)
-                        {
-                            if (tile.Commodity != eCommodity.None)
-                            {
-                                cardManager.InitCard((int)tile.Commodity);
-                            }
-                            else
-                            {
-                                cardManager.InitCard(resource);
-                            }
-                        }
-                    }
+                    if (toHand)
+                        cardManager.AddCardsFromRoll(tile, vertex);
+                    else
+                        cardManager.AddCardsToCache(tile, vertex);
                 }
             }
+        }
+        if (!toHand)
+        {
+            Utils.RaiseEventForPlayer(RaiseEventsCode.GreenPlayerResponse, GameManager.instance.CurrentPlayer, new object[] { cardManager.cachedRollCards.Count == 0 });
         }
     }
 
@@ -480,7 +482,6 @@ public class BuildManager : MonoBehaviourPun
     /// <summary>
     /// Checks the resource on the given tiles id's and send them back to the player
     /// </summary>
-    /// <param name="actorID"> Player to receive the cards</param>
     /// <param name="tilesIds"> Tiles to be checked</param>
     public void TilesNumsToResource(int[] tilesIds)
     {

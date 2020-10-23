@@ -102,7 +102,7 @@ public class Knight : VertexGamePiece
                         StopScaling();
                         data = new object[] { Vertex.ID };
                         buildManager.TurnOffKnightOptions();
-                        turnManager.GiveControl();
+                        turnManager.SetButtonsAndKnightsControl(false);
                         Utils.RaiseEventForPlayer(RaiseEventsCode.DisplaceKnight, this.photonView.Owner.ActorNumber, data);
                         break;
 

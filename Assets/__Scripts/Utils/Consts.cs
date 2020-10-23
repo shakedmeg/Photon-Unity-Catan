@@ -21,6 +21,7 @@ public enum RaiseEventsCode
     PassTurn,
     FinishedThrowing,
     CheckImporveCity,
+    ActivateRobber,
 
 
 
@@ -42,6 +43,7 @@ public enum RaiseEventsCode
     ImproveCity,
     SetImproveCityID,
     TakeImproveCity,
+    CheckIfNeedToPick,
 
 
     // TurnManager
@@ -54,9 +56,16 @@ public enum RaiseEventsCode
     LoseCard,
     TakeCard,
     CompleteTrade,
+    AddCachedCards,
+    PickCard,
 
     // City
     LoseImproveCity,
+
+    // Dice
+    AddGreenPlayer,
+    GreenPlayerResponse,
+    FinishPickCard,
 
 
 }

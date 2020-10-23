@@ -161,6 +161,8 @@ public class Barbarians : MonoBehaviourPun
         if(slider.value == slider.maxValue)
         {
             if (!PhotonNetwork.IsMasterClient) return;
+            if (GameManager.instance.state != GameState.Playing)
+                Utils.RaiseEventForAll(RaiseEventsCode.ActivateRobber);
             Attack();
         }
         else

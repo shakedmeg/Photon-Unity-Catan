@@ -186,7 +186,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10100, guid: 0000000000000000e000000000000000, type: 0}
+  - {fileID: 2100000, guid: 7fe89b47b5a08be4492cfcc523f6771b, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -217,15 +217,15 @@ TextMesh:
   m_GameObject: {fileID: 8593998348744909093}
   m_Text: '2 : 1'
   m_OffsetZ: 0
-  m_CharacterSize: 30
+  m_CharacterSize: 4
   m_LineSpacing: 1
   m_Anchor: 4
-  m_Alignment: 0
+  m_Alignment: 1
   m_TabSize: 4
-  m_FontSize: 0
-  m_FontStyle: 0
+  m_FontSize: 80
+  m_FontStyle: 1
   m_RichText: 1
-  m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Font: {fileID: 12800000, guid: c82ed4e599610dc45905a32f6e8c0623, type: 3}
   m_Color:
     serializedVersion: 2
     rgba: 4278190080

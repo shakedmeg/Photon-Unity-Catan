@@ -43,6 +43,8 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     public GameObject TradeOffersPanel;
 
+    [SerializeField]
+    private GameObject pickCardPanel;
 
     #endregion
 
@@ -65,6 +67,8 @@ public class CardManager : MonoBehaviourPunCallbacks
     #endregion
 
     #region Hand
+
+    public List<int> cachedRollCards = new List<int>(); 
 
     public int allowedCards = 7;
 
@@ -195,7 +199,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                 }
                 else
                 {
-                    turnManager.RegainControl();
+                    turnManager.GainControl();
                 }
                 break;
             case (byte)RaiseEventsCode.LoseCard:
@@ -217,6 +221,14 @@ public class CardManager : MonoBehaviourPunCallbacks
                 if (!photonView.IsMine) return;
                 data = (object[])photonEvent.CustomData;
                 CompleteTrade((int[])data[0], (int[])data[1]);
+                break;
+            case (byte)RaiseEventsCode.AddCachedCards:
+                if (!photonView.IsMine) return;
+                InitCards(cachedRollCards);
+                break;
+            case (byte)RaiseEventsCode.PickCard:
+                if (!photonView.IsMine) return;
+                pickCardPanel.SetActive(true);
                 break;
         }
     }
@@ -303,7 +315,7 @@ public class CardManager : MonoBehaviourPunCallbacks
         switch (commodity)
         {
             case eCommodity.Paper:
-                // This one is long
+                Utils.RaiseEventForAll(RaiseEventsCode.AddGreenPlayer);
                 break;
             case eCommodity.Coin:
                 buildManager.CanBuildKnightsLvl3 = true;
@@ -427,6 +439,33 @@ public class CardManager : MonoBehaviourPunCallbacks
     #endregion
 
     #region Maintain Hands
+
+    public void AddCardsFromRoll(Tile tile, int vertexID)
+    {
+        int resource = (int)tile.Resource;
+        InitCard(resource);
+        if (buildManager.PlayerBuildings[vertexID].Building == eBuilding.City)
+        {
+            if (tile.Commodity != eCommodity.None)
+                InitCard((int)tile.Commodity);
+            else
+                InitCard(resource);
+        }
+    }
+
+    public void AddCardsToCache(Tile tile, int vertexID)
+    {
+        int resource = (int)tile.Resource;
+        cachedRollCards.Add(resource);
+        if (buildManager.PlayerBuildings[vertexID].Building == eBuilding.City)
+        {
+            if (tile.Commodity != eCommodity.None)
+                cachedRollCards.Add((int)tile.Commodity);
+            else
+                cachedRollCards.Add(resource);
+        }
+    }
+
     public void AddCardToHand(Card card)
     {
         if (Utils.IsResourceCard(card))
@@ -509,6 +548,13 @@ public class CardManager : MonoBehaviourPunCallbacks
             card.transform.SetParent(resourceCardsPanel.transform);
         else
             card.transform.SetParent(commodityCardsPanel.transform);
+    }
+
+    public void PickCard(int resource)
+    {
+        pickCardPanel.SetActive(false);
+        InitCard(resource);
+        Utils.RaiseEventForPlayer(RaiseEventsCode.FinishPickCard, GameManager.instance.CurrentPlayer);
     }
 
     #endregion
@@ -607,7 +653,7 @@ public class CardManager : MonoBehaviourPunCallbacks
     {
 
         //robber.photonView.TransferOwnership(0);
-        turnManager.RegainControl(); // change this once robber placement is good
+        turnManager.GainControl(); // change this once robber placement is good
         state = eCardsState.None;
         buildManager.KnightAction = eKnightActions.None;
     }
