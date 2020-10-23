@@ -4,7 +4,6 @@ using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
-using System.Diagnostics.Tracing;
 
 public class Vertex : MonoBehaviourPun
 {
@@ -42,6 +41,8 @@ public class Vertex : MonoBehaviourPun
     private Vector3 p1;
 
     private List<object> data;
+
+    private int port;
 
     #endregion
 
@@ -84,6 +85,8 @@ public class Vertex : MonoBehaviourPun
         name = (string)data[5];
         transform.SetParent(PhotonView.Find((int)data[6]).gameObject.transform);
         Tiles = (int[])data[7];
+        port = (int)data[8];
+
     }
 
 
@@ -105,6 +108,7 @@ public class Vertex : MonoBehaviourPun
                     PreGameBuildSettlement();
                 else
                     BuildSettlement();
+                AddPort();
                 // todo add buildings under player game anchor
                 break;
 
@@ -118,6 +122,7 @@ public class Vertex : MonoBehaviourPun
                 }
                 else
                     BuildCity();
+                AddPort();
                 buildManager.cityCount += 1;
                 turnManager.barbarians.photonView.RPC("BuildCity", RpcTarget.AllBufferedViaServer);
                 break;
@@ -349,7 +354,11 @@ public class Vertex : MonoBehaviourPun
 
 
 
-
+    private void AddPort()
+    {
+        if (port == -1) return;
+        cardManager.UpatePort(port);
+    }
 
 
 

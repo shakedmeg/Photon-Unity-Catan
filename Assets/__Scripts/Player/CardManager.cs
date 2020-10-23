@@ -310,7 +310,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                 break;
             case eCommodity.Silk:
                 commodityPort = ePorts.p2To1;
-                UpdateCommodityPortsText();
+                UpdateCommodityPortsText(Consts.p2to1);
                 break;
         }
     }
@@ -344,12 +344,12 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     #region Port Text Related
 
-    public void UpdateCommodityPortsText()
+    public void UpdateCommodityPortsText(string text)
     {
 
         for(int i = 5; i<8; i++)
         {
-            UpdatePortText(i, "2 : 1");
+            UpdatePortText(i, text);
         }
     }
 
@@ -361,6 +361,33 @@ public class CardManager : MonoBehaviourPunCallbacks
             portTexts[1].text = portText;
         else
             portTexts[port].text = portText;
+    }
+
+    public void UpatePort(int port)
+    {
+        if(port == 5)
+        {
+            List<eResources> keys = new List<eResources>(ports.Keys);
+            foreach(eResources key in keys)
+            {
+                if(ports[key] == ePorts.p4To1)
+                {
+                    ports[key] = ePorts.p3To1;
+                    UpdatePortText((int) key, Consts.p3to1);
+                }
+            }
+            if (commodityPort == ePorts.p4To1)
+            {
+                commodityPort = ePorts.p3To1;
+                UpdateCommodityPortsText(Consts.p3to1);
+
+            }
+        }
+        else
+        {
+            ports[(eResources)port] = ePorts.p2To1;
+            UpdatePortText(port, Consts.p2to1);
+        }
 
     }
 

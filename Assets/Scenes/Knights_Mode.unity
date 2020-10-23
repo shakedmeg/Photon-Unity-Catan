@@ -172,6 +172,7 @@ MonoBehaviour:
   tiles: []
   vertexes: []
   edges: []
+  waterTiles: []
 --- !u!4 &309774710
 Transform:
   m_ObjectHideFlags: 0
@@ -202,6 +203,8 @@ MonoBehaviour:
     type: 3}
   tilePrefab: {fileID: 3402768028362395189, guid: ad01ddd6eaae3cc45b8cab045ea30c10,
     type: 3}
+  waterTilePrefab: {fileID: 1979429268547101335, guid: b05223c6e614ad8478e1ecc25262cd67,
+    type: 3}
   probabilityPrefab: {fileID: 9129041528191778281, guid: 4952ad26978a84742bcfb4ca5610dac0,
     type: 3}
   dicePrefab: {fileID: 8498192513730698223, guid: 1db15fe3bb413214ab41b27a093f4ff4,
@@ -214,6 +217,13 @@ MonoBehaviour:
     type: 3}
   robberPrefab: {fileID: 1457270171187698123, guid: e5d5f0bfeb227a54da9287b33b1a2235,
     type: 3}
+  ports:
+  - {fileID: 720708600611332988, guid: 8e96cf9e7e755ab418a838c8dca49285, type: 3}
+  - {fileID: 5289944394066282071, guid: e89a165bc748293439b5e2096e4c3b3d, type: 3}
+  - {fileID: 5141413637363808266, guid: ee9568699efb4814980842dd6c1ba201, type: 3}
+  - {fileID: 108369492645020089, guid: 9a3f6872902f3ef438fd0eceabd3b162, type: 3}
+  - {fileID: 8311287840420432781, guid: 55dce0e0bf62f8d4f86ed989bc0bcf33, type: 3}
+  - {fileID: 8630871058982486864, guid: 636ac6f4ee31f274c9bec3e50ac1b905, type: 3}
   layoutJSON: {fileID: 4900000, guid: 6ceda1b7c6c94eb46aeee5a608715ab0, type: 3}
   layout: {fileID: 0}
   tiles: []

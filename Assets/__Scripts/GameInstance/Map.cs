@@ -9,7 +9,6 @@ using System;
 public class Map : MonoBehaviourPun
 {
 
-    private List<eResources> resources;
 
     #region Prefabs
 
@@ -17,12 +16,15 @@ public class Map : MonoBehaviourPun
     [Header("Set in Inspector")]
     public GameObject anchorPrefab;
     public GameObject tilePrefab;
+    public GameObject waterTilePrefab;
     public GameObject probabilityPrefab;
     public GameObject dicePrefab;
     public GameObject barbariansPrefab;
     public GameObject openSpotVertexPrefab;
     public GameObject openSpotEdgePrefab;
     public GameObject robberPrefab;
+
+    public GameObject[] ports;
     public TextAsset layoutJSON;
 
 
@@ -43,9 +45,14 @@ public class Map : MonoBehaviourPun
 
     #region Private fields
 
+    private List<eResources> resources;
+    private List<eResources> portType;
 
     private GameObject tilesAnchorGO;
     private int tilesAnchorID;
+
+    private GameObject waterTilesAnchorGO;
+    private int waterTilesAnchorID;
 
     private GameObject freeVertexesAnchorGO;
     private int freeVertexesAnchorID;
@@ -65,6 +72,9 @@ public class Map : MonoBehaviourPun
     private int robberViewID;
     private int barbariansViewID;
 
+    // keys are veretex IDs, Values are 0-5 where 0-4 indicate which eResource this is, and 5 indicates that this is a "any" port (3:1)
+    private Dictionary<int, int> vertexPorts = new Dictionary<int, int>();
+
     #endregion
 
 
@@ -80,6 +90,8 @@ public class Map : MonoBehaviourPun
                                                 eResources.Wheat, eResources.Wheat, eResources.Wheat, eResources.Wheat,
                                                 eResources.Desert
             };
+
+        portType = new List<eResources>() { eResources.Brick, eResources.Ore, eResources.Wheat, eResources.Wood, eResources.Wool };
 
         layout = GetComponent<Layout>();
         layout.ReadLayout(layoutJSON.text);
@@ -121,7 +133,9 @@ public class Map : MonoBehaviourPun
 
         InitAnchors();
         Shuffle(ref resources);
+        Shuffle(ref portType);
         InitTiles();
+        InitWaterTiles();
         InitVertexes();
         InitEdges();
         SendMapViewIDs();
@@ -148,6 +162,12 @@ public class Map : MonoBehaviourPun
             object[] data = new object[] { "_FreeEdgesAnchor" };
             freeEdgesAnchorGO  = PhotonNetwork.InstantiateRoomObject(anchorPrefab.name, Vector3.zero, Quaternion.identity, 0, data);
             freeEdgesAnchorID = freeEdgesAnchorGO.gameObject.GetComponent<PhotonView>().ViewID;
+        }
+        if (waterTilesAnchorGO == null)
+        {
+            object[] data = new object[] { "_WaterTilesAnchorGO" };
+            waterTilesAnchorGO = PhotonNetwork.InstantiateRoomObject(anchorPrefab.name, Vector3.zero, Quaternion.identity, 0, data);
+            waterTilesAnchorID = waterTilesAnchorGO.gameObject.GetComponent<PhotonView>().ViewID;
         }
 
     }
@@ -187,6 +207,36 @@ public class Map : MonoBehaviourPun
     }
 
 
+    private void InitWaterTiles()
+    {
+        bool portToggle = true;
+        bool anyPort = false;
+        for (int i =0; i<Consts.WaterTileNum; i++)
+        {
+            PhotonNetwork.InstantiateRoomObject(waterTilePrefab.name, layout.waterTiles[i].pos, waterTilePrefab.transform.rotation);
+            if (portToggle)
+            {
+                int port;
+                if (!anyPort)
+                {
+                    port = (int)portType[0];
+                    portType.RemoveAt(0);
+                    PhotonNetwork.InstantiateRoomObject(Consts.PortsFolder + ports[port].name, layout.waterTiles[i].pos + new Vector3(0, 0.1f, 0), Quaternion.Euler(layout.waterTiles[i].rot));
+                }
+                else
+                {
+                    port = 5;
+                    PhotonNetwork.InstantiateRoomObject(Consts.PortsFolder + ports[5].name, layout.waterTiles[i].pos + new Vector3(0, 0.1f, 0), Quaternion.Euler(layout.waterTiles[i].rot));
+                }
+                foreach(int vertex in layout.waterTiles[i].vertexes)
+                    vertexPorts.Add(vertex, port);
+                anyPort = !anyPort;
+            }
+            portToggle = !portToggle;
+        }
+    }
+
+
     private void Shuffle(ref List<eResources> resources)
     {
         // Create a temporary List to hold the new shuffle order
@@ -214,8 +264,10 @@ public class Map : MonoBehaviourPun
         openSpotVertexesViewIDs = new int[layout.vertexes.Count];
         GameObject openSpotVertexGO;
         PhotonView openSpotVertexView;
+        int port;
         for (int i = 0; i < layout.vertexes.Count; i++)
         {
+            port = vertexPorts.ContainsKey(i) ? vertexPorts[i] : -1; 
             object[] data = new object[] { layout.vertexes[i].pos,
                                            layout.vertexes[i].id,
                                            layout.vertexes[i].neighbors.ToArray(),
@@ -224,6 +276,7 @@ public class Map : MonoBehaviourPun
                                            "Open_Spot_Vertex" + i.ToString(),
                                            freeVertexesAnchorID,
                                            layout.vertexes[i].tiles.ToArray(),
+                                           port
                 };
             openSpotVertexGO = PhotonNetwork.Instantiate(openSpotVertexPrefab.name, Vector3.zero, Quaternion.identity, 0, data);
             openSpotVertexView = openSpotVertexGO.GetComponent<PhotonView>();

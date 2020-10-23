@@ -9,6 +9,7 @@ public class JsonLayout
     public List<JsonTile> tiles;
     public List<JsonVertex> vertexes;
     public List<JsonEdge> edges;
+    public List<JsonWaterTile> waterTiles;
 }
 [System.Serializable] 
 public class JsonTile
@@ -50,11 +51,21 @@ public class JsonEdge
     public List<int> vertexes = new List<int>();
 }
 
+[System.Serializable] 
+public class JsonWaterTile
+{
+    public int id;
+    public Vector3 pos;
+    public Vector3 rot = Vector3.zero;
+    public List<int> vertexes = new List<int>();
+}
+
 public class Layout : MonoBehaviour
 {
     public List<JsonTile> tiles;
     public List<JsonVertex> vertexes;
     public List<JsonEdge> edges;
+    public List<JsonWaterTile> waterTiles;
 
     public void ReadLayout(string json){
         JsonLayout root = JsonUtility.FromJson<JsonLayout>(json);
@@ -67,5 +78,6 @@ public class Layout : MonoBehaviour
         }
         vertexes = root.vertexes;
         edges = root.edges;
+        waterTiles = root.waterTiles;
     }
 }

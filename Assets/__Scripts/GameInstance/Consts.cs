@@ -66,9 +66,9 @@ public class Consts
 
     public const int NUM_OF_CARDS = 19;
     public const int NumOfTiles = 19;
+    public const int WaterTileNum = 18;
 
     public static List<string> Probabilitiys { get; } = new List<string>() { "5", "2", "6", "3", "8", "10", "9", "12", "11", "4", "8", "10", "9", "4", "5", "6", "3", "11" };
-
     public static Vector3 PROB_LOCAL_POSITION { get; } = new Vector3(0, 0, -2);
 
     public static Vector3 RobberLocalPosition { get; } = new Vector3(-2.7f, 0.15f, 0);
@@ -229,6 +229,15 @@ public class Consts
     
     public const string RequestedContent = "RequestedContent";
 
+
+    #endregion
+
+    #region Ports
+
+    public const string p2to1 = "2 : 1";
+    public const string p3to1 = "3 : 1";
+
+    public const string PortsFolder = "Ports/";
 
     #endregion
 
