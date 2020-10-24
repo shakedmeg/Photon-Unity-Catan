@@ -56,7 +56,7 @@ public class City : VertexGamePiece
         Vector3 p1 = Vector3.zero;
         switch (Vertex.buildManager.Build)
         {
-            case eBuilding.ImproveCity:
+            case eBuildAction.ImproveCity:
                 Setup(ref position, ref p0, ref p1);
 
                 cityImprovement = PhotonNetwork.Instantiate(cityImprovementPrefab.name, p1, cityImprovementPrefab.transform.rotation, 0, new object[] { Utils.ECommodityToString(improveType)}).GetComponent<CityImprovement>();
@@ -66,7 +66,7 @@ public class City : VertexGamePiece
 
                 CleanUp();
                 break;
-            case eBuilding.TakeImprovedCity:
+            case eBuildAction.TakeImprovedCity:
                 Setup(ref position, ref p0, ref p1);
 
                 Debug.Log(improveType);
@@ -80,7 +80,7 @@ public class City : VertexGamePiece
                 
                 CleanUp();
                 break;
-            case eBuilding.Destroy:
+            case eBuildAction.Destroy:
                 Vertex.buildManager.StopScalingCities(Vertex.buildManager.regularCities);
                 Vertex.DestroyCity();
                 break;
@@ -98,7 +98,7 @@ public class City : VertexGamePiece
     private void CleanUp()
     {
         Improved = true;
-        Vertex.buildManager.Build = eBuilding.None;
+        Vertex.buildManager.Build = eBuildAction.None;
         Vertex.buildManager.ImproveCommodity = eCommodity.None;
         Vertex.buildManager.StopScalingCities(Vertex.buildManager.regularCities);
     }

@@ -66,16 +66,22 @@ public class Dice : MonoBehaviourPun
                 bool needToPick = (bool)data[0];
                 if (needToPick)
                 {
+                    if (!greenLvl3Players.FirstOne)
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.SetPlayerPanel, GameManager.instance.CurrentPlayer, new object[] { false });
+                    greenLvl3Players.FirstOne = true;
+                    Debug.LogError("Picking");
                     Utils.RaiseEventForPlayer(RaiseEventsCode.PickCard, photonEvent.Sender);
                 }
                 else
                 {
+                    Debug.LogError("adding");
                     Utils.RaiseEventForPlayer(RaiseEventsCode.AddCachedCards, photonEvent.Sender);
                     FinishPicking(photonEvent.Sender);
                 }
                 break;
             case (byte)RaiseEventsCode.FinishPickCard:
                 if (!photonView.IsMine) return;
+                Utils.RaiseEventForPlayer(RaiseEventsCode.SetPlayerPanel, GameManager.instance.CurrentPlayer, new object[] { true });
                 FinishPicking(photonEvent.Sender);
                 break;
         }
@@ -107,8 +113,9 @@ public class Dice : MonoBehaviourPun
     {
         if (diceNumber == 7)
         {
-            // UNCOMMENT TO ENABLE ROBBER!
-            Utils.RaiseEventForAll(RaiseEventsCode.SevenRolled);
+            //// UNCOMMENT TO ENABLE ROBBER!
+            //playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+            //Utils.RaiseEventForAll(RaiseEventsCode.SevenRolled);
         }
         else
         {
@@ -135,8 +142,7 @@ public class Dice : MonoBehaviourPun
         if (greenLvl3Players.AllFinished())
         {
             greenLvl3Players.Reset();
-            Debug.Log("Return Control to Rolling Player");
-            turnManager.GainControl();
+            Utils.RaiseEventForPlayer(RaiseEventsCode.GainTurnControl, GameManager.instance.CurrentPlayer);
         }
     }
     public void SetCollider(bool flag)

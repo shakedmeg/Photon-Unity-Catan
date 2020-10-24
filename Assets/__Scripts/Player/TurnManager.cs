@@ -9,6 +9,7 @@ using UnityEngine.UI;
 public class TurnManager : MonoBehaviourPun
 {
     #region Private Fields
+    private PlayerSetup playerSetup;
 
     private BuildManager buildManager;
 
@@ -44,6 +45,7 @@ public class TurnManager : MonoBehaviourPun
 
         if (photonView.IsMine)
         {
+            playerSetup = GetComponent<PlayerSetup>();
             buildManager = GetComponent<BuildManager>();
             cardManager = GetComponent<CardManager>();
         }
@@ -83,6 +85,10 @@ public class TurnManager : MonoBehaviourPun
                 Dice.ActivateEventDice();
                 barbarians.gameObject.SetActive(true);
                 break;
+            case (byte)RaiseEventsCode.GainTurnControl:
+                if (!photonView.IsMine) return;
+                GainControl();
+                break;
         }
     }
 
@@ -114,6 +120,7 @@ public class TurnManager : MonoBehaviourPun
         cardManager.CloseTrade();
         cardManager.ClearOffers();
         ButtonsPanel.gameObject.SetActive(false);
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
         Utils.RaiseEventForAll(RaiseEventsCode.PassTurn);
 
     }

@@ -24,6 +24,7 @@ public class Edge : MonoBehaviourPun
     private Quaternion angle;
 
 
+    private PlayerSetup playerSetup;
     private BuildManager buildManager;
     private CardManager cardManager;
 
@@ -76,7 +77,7 @@ public class Edge : MonoBehaviourPun
         Vector3 p0;
         switch (buildManager.Build)
         {
-            case eBuilding.Road:
+            case eBuildAction.Road:
                 p1 = new Vector3(transform.position.x, Consts.DROP_HIGHET, transform.position.z);
                 p0 = new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z);
                 GameObject roadGameObject = PhotonNetwork.Instantiate(roadPrefab.name, p1, angle, 0, data);
@@ -86,10 +87,10 @@ public class Edge : MonoBehaviourPun
                 
                 if (GameManager.instance.state == GameState.SetupSettlement || GameManager.instance.state == GameState.SetupCity)
                 {
-                    buildManager.Build = eBuilding.None;
+                    buildManager.Build = eBuildAction.None;
                     buildManager.RoadCleanUp();
+                    playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
                     Utils.RaiseEventForAll(RaiseEventsCode.PassTurn);
-                    //buildManager.PassSetupTurn();
                 }
                 else
                 {
@@ -125,6 +126,7 @@ public class Edge : MonoBehaviourPun
     [PunRPC]
     void SetPlayerManagers()
     {
+        playerSetup = PlayerSetup.LocalPlayerInstance.GetComponent<PlayerSetup>();
         buildManager = GameManager.instance.playerGameObject.GetComponent<BuildManager>();
         cardManager = GameManager.instance.playerGameObject.GetComponent<CardManager>();
     }

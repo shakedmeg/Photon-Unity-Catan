@@ -57,15 +57,15 @@ public class Knight : VertexGamePiece
 
     void OnMouseDown()
     {
-        if (buildManager.Build == eBuilding.UpgradeKnight)
+        if (buildManager.Build == eBuildAction.UpgradeKnight)
         {
             Vertex.UpgradeKnight();
             buildManager.StopScalingKnights(false);
         }
         else
         {
-            if (buildManager.Build == eBuilding.ActivateKnight && Activated) return;
-            if (buildManager.Build == eBuilding.ActivateKnight)
+            if (buildManager.Build == eBuildAction.ActivateKnight && Activated) return;
+            if (buildManager.Build == eBuildAction.ActivateKnight)
             {
                 Activated = true;
                 this.photonView.RPC("ChangeHeadColor", RpcTarget.AllBufferedViaServer, true);

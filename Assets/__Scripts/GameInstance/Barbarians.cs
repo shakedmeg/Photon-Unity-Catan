@@ -37,7 +37,6 @@ public class Barbarians : MonoBehaviourPun
 
     void Attack()
     {
-        Debug.LogError("Attack!");
         int playersStrength = 0;
         foreach (int str in knightsPower.Values)
             playersStrength += str;
@@ -67,7 +66,6 @@ public class Barbarians : MonoBehaviourPun
     [PunRPC]
     void ContinueLostCheck(bool response)
     {
-        Debug.Log(response);
         if (response)
             needToLoseCity.Add(mightNeedToLoseCity[needToLoseCurrent].Key);
 

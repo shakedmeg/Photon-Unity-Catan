@@ -95,6 +95,7 @@
      <Compile Include="Assets\__Scripts\Player\CardManager.cs" />
      <Compile Include="Assets\__Scripts\Player\PlayerSetup.cs" />
      <Compile Include="Assets\__Scripts\Player\TurnManager.cs" />
+     <Compile Include="Assets\__Scripts\UI\Data\PlayerPanel.cs" />
      <Compile Include="Assets\__Scripts\UI\Lobby\ColorDropdown.cs" />
      <Compile Include="Assets\__Scripts\UI\Lobby\ColorOptionData.cs" />
      <Compile Include="Assets\__Scripts\UI\Throw\PlayerIcon.cs" />

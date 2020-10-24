@@ -10,6 +10,7 @@ using UnityEngine.PlayerLoop;
 
 public class CardManager : MonoBehaviourPunCallbacks
 {
+    PlayerSetup playerSetup;
     BuildManager buildManager;
     TurnManager turnManager;
 
@@ -148,6 +149,7 @@ public class CardManager : MonoBehaviourPunCallbacks
     {
         if (photonView.IsMine)
         {
+            playerSetup = GetComponent<PlayerSetup>();
             buildManager = GetComponent<BuildManager>();
             turnManager = GetComponent<TurnManager>();
             state = eCardsState.None;
@@ -184,6 +186,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                     setCardsColliders(true);
                     numOfCardToThorw = numOfCards / 2;
                     cardsToThorw = new List<Card>(numOfCardToThorw);
+                    playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.Bad);
                     throwCardsPanel.SetActive(true);
                 }
                 else
@@ -193,6 +196,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                 break;
             case (byte)RaiseEventsCode.FinishRollSeven:
                 if (!photonView.IsMine) return;
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, true);
                 if (GameManager.instance.state == GameState.Playing)
                 {
                     StartRob();
@@ -228,6 +232,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                 break;
             case (byte)RaiseEventsCode.PickCard:
                 if (!photonView.IsMine) return;
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.Good);
                 pickCardPanel.SetActive(true);
                 break;
         }
@@ -269,8 +274,10 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     public void AllowBuild(int buildOption)
     {
+        eBuildAction buildAction = (eBuildAction)buildOption + 1;
         eBuilding building = (eBuilding)buildOption + 1;
-        if (CheckPriceInHand(Consts.Prices[building]))
+        if (buildManager.buildingAmounts[building] == 0) return;
+        if (CheckPriceInHand(Consts.Prices[buildAction]))
         {
             buildManager.ButtonHandler(buildOption);
         }
@@ -432,6 +439,7 @@ public class CardManager : MonoBehaviourPunCallbacks
         state = eCardsState.None;
         throwCardsPanel.SetActive(false);
         setCardsColliders(false);
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
         Utils.RaiseEventForAll(RaiseEventsCode.FinishedThrowing);
 
     }
@@ -554,7 +562,8 @@ public class CardManager : MonoBehaviourPunCallbacks
     {
         pickCardPanel.SetActive(false);
         InitCard(resource);
-        Utils.RaiseEventForPlayer(RaiseEventsCode.FinishPickCard, GameManager.instance.CurrentPlayer);
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+        Utils.RaiseEventForMaster(RaiseEventsCode.FinishPickCard);
     }
 
     #endregion
@@ -630,7 +639,6 @@ public class CardManager : MonoBehaviourPunCallbacks
         int numOfCards = resourcesHand.Count + commodityHand.Count;
         if (numOfCards == 0) return -1;
         int chosen = Random.Range(0, numOfCards);
-        Debug.LogFormat("resources = {0}, commodities = {1} chosen is {2}", resourcesHand.Count, commodityHand.Count, chosen);
         if (chosen < resourcesHand.Count)
         {
             ResourceCard resourceCard = resourcesHand[chosen];

@@ -18,6 +18,7 @@ public class GreenLvl3Players
 {
     public List<GreenLvl3Player> Players { get; set; } = new List<GreenLvl3Player>();
 
+    public bool FirstOne { get; set; }
 
     public bool IsEmpty()
     {
@@ -44,6 +45,7 @@ public class GreenLvl3Players
 
     public void Reset()
     {
+        FirstOne = false;
         foreach (GreenLvl3Player player in Players)
             player.Finished = false;
     }

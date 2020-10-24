@@ -18,7 +18,7 @@ public class BuildManager : MonoBehaviourPun
 
     #region Private Fields
 
-
+    public PlayerSetup playerSetup;
     private CardManager cardManager;
     private TurnManager turnManager;
 
@@ -102,13 +102,25 @@ public class BuildManager : MonoBehaviourPun
 
     public List<Vertex> regularCities = new List<Vertex>();
 
+
+    public Dictionary<eBuilding, int> buildingAmounts = new Dictionary<eBuilding, int>() 
+    {
+        { eBuilding.Road, 15 },
+        { eBuilding.Settlement, 5 },
+        { eBuilding.City, 4 },
+        { eBuilding.Wall, 3 },
+        { eBuilding.Knight, 2 },
+        { eBuilding.Knight2, 2 },
+        { eBuilding.Knight3, 2 },
+    };
+
     #endregion
 
 
     #region Properties
 
     public bool CanBuildKnightsLvl3 { get; set; } = false;
-    public eBuilding Build { get; set; }
+    public eBuildAction Build { get; set; }
     public eKnightActions KnightAction { get; set; }
 
     public eCommodity ImproveCommodity { get; set; }
@@ -126,6 +138,7 @@ public class BuildManager : MonoBehaviourPun
             object color;
             PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(Consts.PLAYER_COLOR, out color);
             playerColor = (string)color;
+            playerSetup = GetComponent<PlayerSetup>();
             cardManager = GetComponent<CardManager>();
             turnManager = GetComponent<TurnManager>();
         }
@@ -161,11 +174,11 @@ public class BuildManager : MonoBehaviourPun
                 InitMapStructs((int[])data[1], (int[])data[2], (int[])data[3]);
                 break;
             case (byte)RaiseEventsCode.PreSetupSettlement:
-                Build = eBuilding.Settlement;
+                Build = eBuildAction.Settlement;
                 SetDictActive(FreeVertexes, true);
                 break;
             case (byte)RaiseEventsCode.PreSetupCity:
-                Build = eBuilding.City;
+                Build = eBuildAction.City;
                 SetDictActive(FreeVertexes, true);
                 break;
             case (byte)RaiseEventsCode.MatchTilesToDice:
@@ -211,20 +224,21 @@ public class BuildManager : MonoBehaviourPun
                 break;
             case (byte)RaiseEventsCode.LoseCity:
                 if (!photonView.IsMine) return;
-                Build = eBuilding.Destroy;
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.LoseCity);
+                Build = eBuildAction.Destroy;
                 foreach (Vertex vertex in regularCities)
                     vertex.City.InitScaleUpDown(Consts.CityRegularScale, Consts.ScaleCity);
                 break;
             case (byte)RaiseEventsCode.ImproveCity:
                 data = (object[])photonEvent.CustomData;
-                Build = eBuilding.ImproveCity;
+                Build = eBuildAction.ImproveCity;
                 ImproveCommodity = (eCommodity)data[0];
                 foreach (Vertex vertex in regularCities)
                     vertex.City.InitScaleUpDown(Consts.CityRegularScale, Consts.ScaleCity);
                 break;
             case (byte)RaiseEventsCode.TakeImproveCity:
                 data = (object[])photonEvent.CustomData;
-                Build = eBuilding.TakeImprovedCity;
+                Build = eBuildAction.TakeImprovedCity;
                 ImproveCommodity = (eCommodity)data[0];
                 foreach (Vertex vertex in regularCities)
                     vertex.City.InitScaleUpDown(Consts.CityRegularScale, Consts.ScaleCity);
@@ -419,7 +433,7 @@ public class BuildManager : MonoBehaviourPun
         }
         if (!toHand)
         {
-            Utils.RaiseEventForPlayer(RaiseEventsCode.GreenPlayerResponse, GameManager.instance.CurrentPlayer, new object[] { cardManager.cachedRollCards.Count == 0 });
+            Utils.RaiseEventForMaster(RaiseEventsCode.GreenPlayerResponse, new object[] { cardManager.cachedRollCards.Count == 0 });
         }
     }
 
@@ -468,7 +482,7 @@ public class BuildManager : MonoBehaviourPun
     public void PreSetupRoad(int[] roads)
     {
 
-        Build = eBuilding.Road;
+        Build = eBuildAction.Road;
         SetDictActive(FreeVertexes, false);
 
         for (int i = 0; i < roads.Length; i++)
@@ -609,14 +623,14 @@ public class BuildManager : MonoBehaviourPun
 
     public void ButtonHandler(int buildOption)
     {
-        if(Build != eBuilding.None)
+        if(Build != eBuildAction.None)
         {
             int oldBuild = (int)Build - 1;
             buttons[oldBuild].enabled = true;
             Invoke(buttonCleanUps[oldBuild], 0);
         }
 
-        Build = (eBuilding)buildOption+1;
+        Build = (eBuildAction)buildOption+1;
         buttons[buildOption].enabled = false;
         cancelButton.gameObject.SetActive(true);
         Invoke(buttonHandlers[buildOption], 0);
@@ -627,7 +641,7 @@ public class BuildManager : MonoBehaviourPun
 
     public void BuildRoad()
     {
-        Build = eBuilding.Road;
+        Build = eBuildAction.Road;
         HashSet<int> openEdgesToDisplay = new HashSet<int>();
 
         foreach (Vertex vertex in PlayerBuildings.Values)
@@ -663,7 +677,7 @@ public class BuildManager : MonoBehaviourPun
 
     public void BuildSettlement()
     {
-        Build = eBuilding.Settlement;
+        Build = eBuildAction.Settlement;
 
         HashSet<int> openVertexesToDisplay = new HashSet<int>();
 
@@ -681,7 +695,7 @@ public class BuildManager : MonoBehaviourPun
 
     public void BuildCity()
     {
-        Build = eBuilding.City;
+        Build = eBuildAction.City;
         List<int> settlements = new List<int>();
 
         foreach (KeyValuePair<int, Vertex> entry in PlayerBuildings)
@@ -700,7 +714,7 @@ public class BuildManager : MonoBehaviourPun
 
     public void BuildWall()
     {
-        Build = eBuilding.Wall;
+        Build = eBuildAction.Wall;
         List<int> cities = new List<int>();
 
         foreach (KeyValuePair<int, Vertex> entry in PlayerBuildings)
@@ -719,7 +733,7 @@ public class BuildManager : MonoBehaviourPun
 
     public void BuildKnight()
     {
-        Build = eBuilding.Knight;
+        Build = eBuildAction.Knight;
         HashSet<int> freeVertexesToDisplay = new HashSet<int>();
         HashSet<int> knightsVertexesToDisplay = new HashSet<int>();
 
@@ -747,7 +761,7 @@ public class BuildManager : MonoBehaviourPun
 
     public void UpgradeKnight()
     {
-        Build = eBuilding.UpgradeKnight;
+        Build = eBuildAction.UpgradeKnight;
         HashSet<int> optionalKnights = new HashSet<int>();
         foreach (KeyValuePair<int, Vertex> entry in PlayerKnights)
         {
@@ -765,7 +779,7 @@ public class BuildManager : MonoBehaviourPun
     
     public void ActivateKnight()
     {
-        Build = eBuilding.ActivateKnight;
+        Build = eBuildAction.ActivateKnight;
 
         HashSet<int> optionalKnights = new HashSet<int>();
         foreach(KeyValuePair<int, Vertex> entry in PlayerKnights)
@@ -790,7 +804,7 @@ public class BuildManager : MonoBehaviourPun
         int buildOption = (int)Build - 1;
         buttons[buildOption].enabled = true;
         Invoke(buttonCleanUps[buildOption], 0);
-        Build = eBuilding.None;
+        Build = eBuildAction.None;
         cancelButton.gameObject.SetActive(false);
     }
 

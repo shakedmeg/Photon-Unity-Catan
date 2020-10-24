@@ -1,9 +1,13 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 
 
-public enum eBuilding { None, Road, Settlement, City, Wall, Knight, UpgradeKnight, ActivateKnight, ImproveCity, Knight2, Knight3, Destroy, TakeImprovedCity }
+public enum eBuildAction { None, Road, Settlement, City, Wall, Knight, UpgradeKnight, ActivateKnight, ImproveCity, Destroy, TakeImprovedCity }
+
+public enum eBuilding { None, Road, Settlement, City, Wall, Knight, Knight2, Knight3 }
+
 public enum eResources { Brick, Ore, Wheat, Wood, Wool, Desert = 100};
 public enum eCommodity { None, Coin=5, Paper, Silk };
 public enum eKnightActions { None, TakeAction, Move, MoveRobber, MoveKnight};
@@ -49,6 +53,7 @@ public enum RaiseEventsCode
     // TurnManager
     StartTurn,
     ActivateBarbarians,
+    GainTurnControl,
 
     // CardManager
     SevenRolled,
@@ -66,6 +71,9 @@ public enum RaiseEventsCode
     AddGreenPlayer,
     GreenPlayerResponse,
     FinishPickCard,
+
+    // PlayerSetup
+    SetPlayerPanel,
 
 
 }
@@ -209,15 +217,15 @@ public class Consts
     public const string UpgradeCityCleanUp = "UpgradeCityCleanUp";
 
 
-    public static Dictionary<eBuilding, Dictionary<eResources, int>> Prices { get; } = new Dictionary<eBuilding, Dictionary<eResources, int>>()
+    public static Dictionary<eBuildAction, Dictionary<eResources, int>> Prices { get; } = new Dictionary<eBuildAction, Dictionary<eResources, int>>()
     {
-        {eBuilding.Road, new Dictionary<eResources,int>() { { eResources.Brick , 1}, { eResources.Wood, 1 } } },
-        {eBuilding.Settlement, new Dictionary<eResources, int>() { { eResources.Brick, 1 }, { eResources.Wood, 1 }, { eResources.Wheat , 1}, { eResources.Wool, 1 } } },
-        {eBuilding.City, new Dictionary<eResources,int>() { { eResources.Ore, 3 }, { eResources.Wheat, 2 } } } ,
-        {eBuilding.Wall, new Dictionary<eResources,int>() { { eResources.Brick, 2} } } ,
-        {eBuilding.Knight, new Dictionary<eResources,int>() { { eResources.Ore, 1 }, { eResources.Wool, 1 } } },
-        {eBuilding.UpgradeKnight, new Dictionary<eResources,int>() { { eResources.Ore, 1 }, { eResources.Wool, 1 } } },
-        {eBuilding.ActivateKnight, new Dictionary<eResources, int>() { { eResources.Wheat, 1 } } },
+        {eBuildAction.Road, new Dictionary<eResources,int>() { { eResources.Brick , 1}, { eResources.Wood, 1 } } },
+        {eBuildAction.Settlement, new Dictionary<eResources, int>() { { eResources.Brick, 1 }, { eResources.Wood, 1 }, { eResources.Wheat , 1}, { eResources.Wool, 1 } } },
+        {eBuildAction.City, new Dictionary<eResources,int>() { { eResources.Ore, 3 }, { eResources.Wheat, 2 } } } ,
+        {eBuildAction.Wall, new Dictionary<eResources,int>() { { eResources.Brick, 2} } } ,
+        {eBuildAction.Knight, new Dictionary<eResources,int>() { { eResources.Ore, 1 }, { eResources.Wool, 1 } } },
+        {eBuildAction.UpgradeKnight, new Dictionary<eResources,int>() { { eResources.Ore, 1 }, { eResources.Wool, 1 } } },
+        {eBuildAction.ActivateKnight, new Dictionary<eResources, int>() { { eResources.Wheat, 1 } } },
     };
 
     #endregion
@@ -250,4 +258,13 @@ public class Consts
 
     #endregion
 
+    #region PlayerPanelUI
+
+    public const string Good = "Green";
+    public const string Bad = "Bad";
+    public const string LoseCity = "LoseCity";
+    public const string Default = "Default";
+
+
+    #endregion
 }

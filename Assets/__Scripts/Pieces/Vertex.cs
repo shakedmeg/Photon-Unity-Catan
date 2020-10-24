@@ -99,7 +99,7 @@ public class Vertex : MonoBehaviourPun
         p0 = transform.position;
         switch (buildManager.Build)
         {
-            case eBuilding.Settlement:
+            case eBuildAction.Settlement:
                 p1 = transform.position + new Vector3(0, Consts.DROP_HIGHET, 0);
                 p0 = transform.position + Vector3.up;
                 photonView.RPC("SetOwner", RpcTarget.AllBufferedViaServer, PhotonNetwork.LocalPlayer.ActorNumber);
@@ -109,10 +109,11 @@ public class Vertex : MonoBehaviourPun
                 else
                     BuildSettlement();
                 AddPort();
+                buildManager.playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 1);
                 // todo add buildings under player game anchor
                 break;
 
-            case eBuilding.City:
+            case eBuildAction.City:
                 p1 = transform.position + new Vector3(-1, Consts.DROP_HIGHET, 0);
                 p0 = transform.position + new Vector3(-1, 1.25f, 0);
                 if (GameManager.instance.state == GameState.SetupSettlement || GameManager.instance.state == GameState.SetupCity)
@@ -124,10 +125,11 @@ public class Vertex : MonoBehaviourPun
                     BuildCity();
                 AddPort();
                 buildManager.cityCount += 1;
+                buildManager.playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 1);
                 turnManager.barbarians.photonView.RPC("BuildCity", RpcTarget.AllBufferedViaServer);
                 break;
 
-            case eBuilding.Wall:
+            case eBuildAction.Wall:
                 HasWall = true;
                 p1 = new Vector3(transform.position.x + Consts.DropWall, transform.position.y+0.25f, transform.position.z);
                 p0 = transform.position + new Vector3(0, 0.25f, 0);
@@ -141,7 +143,7 @@ public class Vertex : MonoBehaviourPun
                 //buildManager.WallCleanUp();
                 break;
 
-            case eBuilding.Knight:
+            case eBuildAction.Knight:
                 BuildKnight();
                 //buildManager.KnightCleanUp();
                 AddKnight();
@@ -199,7 +201,7 @@ public class Vertex : MonoBehaviourPun
     private void PreGameBuildSettlement()
     {
         Build(ref settlement, settlementPrefab.name, Quaternion.identity, data, eBuilding.Settlement);
-        buildManager.Build = eBuilding.None;
+        buildManager.Build = eBuildAction.None;
         buildManager.PreSetupRoad(Edges);
     }
 
@@ -217,7 +219,7 @@ public class Vertex : MonoBehaviourPun
         Build(ref city, cityPrefab.name, Quaternion.Euler(270,0,0), data, eBuilding.City);
         UpdateVertexes();
         buildManager.TilesNumsToResource(Tiles);
-        buildManager.Build = eBuilding.None;
+        buildManager.Build = eBuildAction.None;
         buildManager.PreSetupRoad(Edges);
 
     }
@@ -243,8 +245,9 @@ public class Vertex : MonoBehaviourPun
         Build(ref settlement, settlementPrefab.name, Quaternion.identity, data, eBuilding.Settlement);
         Building = eBuilding.Settlement;
         city = null;
-        buildManager.Build = eBuilding.None;
+        buildManager.Build = eBuildAction.None;
         buildManager.cityCount -= 1;
+        buildManager.playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
         turnManager.barbarians.photonView.RPC("CityDestroyed", RpcTarget.AllBufferedViaServer, PhotonNetwork.LocalPlayer.ActorNumber);
     }
 
@@ -253,26 +256,15 @@ public class Vertex : MonoBehaviourPun
 
     #region Common Piece Helpers
 
-    //private void Build<T>(ref T t, string name, Quaternion rotation, List<object> data, eBuilding building = eBuilding.None) where T : VertexGamePiece
-    //{
-    //    if (building != eBuilding.None) Building = building;
-    //    t = PhotonNetwork.Instantiate(name, p1, rotation, 0, data.ToArray()).GetComponent<T>();
-    //    t.InitDrop(p1, p0);
-    //    t.Vertex = this;
-    //    if (!(GameManager.instance.state == GameState.SetupSettlement || GameManager.instance.state == GameState.SetupCity))
-    //    {   
-    //        cardManager.Pay();
-    //        buildManager.CleanUp();
-    //    }
-    //}
-
-
     private void Build<T>(ref T t, string name, Quaternion rotation, List<object> data, eBuilding building = eBuilding.None) where T : VertexGamePiece
     {
         if (building != eBuilding.None) Building = building;
         t = PhotonNetwork.Instantiate(name, p1, rotation, 0, data.ToArray()).GetComponent<T>();
         t.InitDrop(p1, p0);
         t.Vertex = this;
+        buildManager.buildingAmounts[Building] -= 1;
+        Debug.Log(buildManager.buildingAmounts[Building].ToString());
+        buildManager.playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)Building-1, buildManager.buildingAmounts[Building].ToString());
     }
 
     private void AfterBuild()

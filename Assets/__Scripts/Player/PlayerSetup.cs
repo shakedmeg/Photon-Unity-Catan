@@ -2,12 +2,19 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
+using ExitGames.Client.Photon;
 
 public class PlayerSetup : MonoBehaviourPun
 {
     public static GameObject LocalPlayerInstance;
 
     public Canvas canvas;
+
+    public GameObject playersDataPanel;
+
+    public GameObject playerPanelPrefab;
+
+    public PlayerPanel playerPanel;
 
     void Awake()
     {
@@ -16,6 +23,12 @@ public class PlayerSetup : MonoBehaviourPun
             LocalPlayerInstance = gameObject;
             canvas.gameObject.SetActive(true);
             canvas.worldCamera = GameObject.Find("Main Camera").GetComponent<Camera>();
+
+            object color;
+            PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(Consts.PLAYER_COLOR, out color);
+            string playerColor = (string)color;
+            playerPanel = PhotonNetwork.Instantiate(playerPanelPrefab.name, playerPanelPrefab.transform.position, playerPanelPrefab.transform.rotation, 0, new object[] { playerColor }).GetComponent<PlayerPanel>();
+            playerPanel.photonView.RPC("SetParent", RpcTarget.All);
         }
 
         // #Critical
@@ -23,15 +36,34 @@ public class PlayerSetup : MonoBehaviourPun
         DontDestroyOnLoad(gameObject);
     }
 
-    // Start is called before the first frame update
-    void Start()
-    {
 
+
+    private void OnEnable()
+    {
+        PhotonNetwork.NetworkingClient.EventReceived += OnEvent;
     }
 
-    // Update is called once per frame
-    void Update()
+    private void OnDisable()
     {
+        PhotonNetwork.NetworkingClient.EventReceived -= OnEvent;
+    }
 
+    void OnEvent(EventData photonEvent)
+    {
+        object[] data;
+        switch (photonEvent.Code)
+        {
+            case (byte)RaiseEventsCode.PreSetupSettlement:
+            case (byte)RaiseEventsCode.PreSetupCity:
+            case (byte)RaiseEventsCode.StartTurn:
+                if (!photonView.IsMine) return;
+                playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, true);
+                break;
+            case (byte)RaiseEventsCode.SetPlayerPanel:
+                data = (object[])photonEvent.CustomData;
+                if (!photonView.IsMine) return;
+                playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, (bool)data[0]);
+                break;
+        }
     }
 }
