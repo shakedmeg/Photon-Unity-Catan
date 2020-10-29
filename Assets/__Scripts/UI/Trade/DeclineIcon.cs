@@ -6,7 +6,7 @@ using Photon.Pun;
 public class DeclineIcon : MonoBehaviourPun
 {
     [SerializeField]
-    private ChoosePanel choosePanel;
+    private ChoosePanel choosePanel = null;
     
     void OnMouseDown()
     {

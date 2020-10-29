@@ -6,7 +6,7 @@ using Photon.Pun;
 public class AcceptIcon : MonoBehaviour
 {
     [SerializeField]
-    private ChoosePanel choosePanel;
+    private ChoosePanel choosePanel = null;
 
     void OnMouseDown()
     {

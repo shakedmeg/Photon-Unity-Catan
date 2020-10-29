@@ -17,19 +17,29 @@ public class Dice : MonoBehaviourPun
 
     private PlayerSetup playerSetup;
     private TurnManager turnManager;
+    private CardManager cardManager;
 
     private Barbarians barbarians;
 
     private int score;
 
-    /// <summary>
-    /// 
-    /// </summary>
+
+
+
     private GreenLvl3Players greenLvl3Players = new GreenLvl3Players();
 
     private List<Vector3> quats = new List<Vector3>() {
         new Vector3(90, 0 , 0), new Vector3(0, 90, 0), new Vector3(0, 0, 0), new Vector3(180, 0, 0), new Vector3(0, 270, 0), new Vector3(270, 0, 0)
     };
+
+
+    private Vector3 s0, s1;
+    private bool scaling = false;
+    private float scaleStart;
+    private bool loopScale;
+    protected Vector3 scaleToFinishAt;
+
+
 
     void Awake() {
         bColl = GetComponent<BoxCollider>();
@@ -40,6 +50,10 @@ public class Dice : MonoBehaviourPun
         bColl.enabled = false;
     }
 
+    void Update()
+    {
+        ScaleUpDown();
+    }
 
 
     private void OnEnable()
@@ -69,12 +83,10 @@ public class Dice : MonoBehaviourPun
                     if (!greenLvl3Players.FirstOne)
                         Utils.RaiseEventForPlayer(RaiseEventsCode.SetPlayerPanel, GameManager.instance.CurrentPlayer, new object[] { false });
                     greenLvl3Players.FirstOne = true;
-                    Debug.LogError("Picking");
                     Utils.RaiseEventForPlayer(RaiseEventsCode.PickCard, photonEvent.Sender);
                 }
                 else
                 {
-                    Debug.LogError("adding");
                     Utils.RaiseEventForPlayer(RaiseEventsCode.AddCachedCards, photonEvent.Sender);
                     FinishPicking(photonEvent.Sender);
                 }
@@ -84,11 +96,14 @@ public class Dice : MonoBehaviourPun
                 Utils.RaiseEventForPlayer(RaiseEventsCode.SetPlayerPanel, GameManager.instance.CurrentPlayer, new object[] { true });
                 FinishPicking(photonEvent.Sender);
                 break;
+            case (byte)RaiseEventsCode.SendDiceScore:
+                SendNumber(score);
+                break;
         }
     }
 
     void OnMouseDown() {
-        //bColl.enabled = false;
+        StopScaling();
         int yellowDiceNum = Random.Range(0, 6);
         int redDiceNum = Random.Range(0, 6);
         int eventDiceNum = Random.Range(0, 6);
@@ -113,9 +128,9 @@ public class Dice : MonoBehaviourPun
     {
         if (diceNumber == 7)
         {
-            //// UNCOMMENT TO ENABLE ROBBER!
-            //playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
-            //Utils.RaiseEventForAll(RaiseEventsCode.SevenRolled);
+            // COMMENT TO DISABLE ROBBER!
+            playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+            Utils.RaiseEventForAll(RaiseEventsCode.SevenRolled);
         }
         else
         {
@@ -156,6 +171,52 @@ public class Dice : MonoBehaviourPun
     }
 
 
+    public void InitScaleUpDown(Vector3 s0, Vector3 s1)
+    {
+        bColl.enabled = true;
+        this.s0 = s0;
+        this.s1 = s1;
+        scaleStart = Time.time;
+        scaling = true;
+        loopScale = true;
+        scaleToFinishAt = s0;
+    }
+
+    protected void ScaleUpDown()
+    {
+        bool assign = true;
+        if (scaling)
+        {
+            float u = (Time.time - scaleStart) / Consts.ScaleTime;
+            if (u >= 1)
+            {
+                u = 1;
+                if (loopScale)
+                {
+                    transform.localScale = (1 - u) * s0 + u * s1;
+                    assign = false;
+                    Vector3 temp = s0;
+                    s0 = s1;
+                    s1 = temp;
+                    scaleStart = Time.time;
+                }
+                else
+                {
+                    scaling = false;
+                }
+            }
+            if (assign)
+                transform.localScale = (1 - u) * s0 + u * s1;
+        }
+    }
+
+    public virtual void StopScaling()
+    {
+        bColl.enabled = false;
+        scaling = false;
+        transform.localScale = scaleToFinishAt;
+    }
+
     [PunRPC]
     public void SetDice(int yellowDice, int redDice, int eventDice)
     {
@@ -168,6 +229,7 @@ public class Dice : MonoBehaviourPun
     public void Init(int barbariansID)
     {
         playerSetup = PlayerSetup.LocalPlayerInstance.GetComponent<PlayerSetup>();
+        cardManager = PlayerSetup.LocalPlayerInstance.GetComponent<CardManager>();
         turnManager = PlayerSetup.LocalPlayerInstance.GetComponent<TurnManager>();
 
         transform.SetParent(playerSetup.canvas.transform);

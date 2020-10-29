@@ -6,7 +6,6 @@ using Photon.Realtime;
 using ExitGames.Client.Photon;
 using System.Linq;
 using UnityEngine.UI;
-using UnityEngine.PlayerLoop;
 
 public class CardManager : MonoBehaviourPunCallbacks
 {
@@ -22,9 +21,16 @@ public class CardManager : MonoBehaviourPunCallbacks
     public List<Text> improveButtons;
 
 
-    public GameObject resourceCardsPanel;
-    public GameObject commodityCardsPanel;
 
+
+    [SerializeField]
+    private CanvasGroup mainPanel = null;
+
+    [SerializeField]
+    private GameObject resourceCardsPanel = null;
+
+    [SerializeField]
+    private GameObject commodityCardsPanel = null;
 
     public GameObject throwCardsPanel;
     public GameObject throwCardsContent;
@@ -45,7 +51,7 @@ public class CardManager : MonoBehaviourPunCallbacks
     public GameObject TradeOffersPanel;
 
     [SerializeField]
-    private GameObject pickCardPanel;
+    private GameObject pickCardPanel = null;
 
     #endregion
 
@@ -183,7 +189,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                 if (numOfCards > allowedCards)
                 {
                     state = eCardsState.Throw;
-                    setCardsColliders(true);
+                    SetMainPanelActive(true);
                     numOfCardToThorw = numOfCards / 2;
                     cardsToThorw = new List<Card>(numOfCardToThorw);
                     playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.Bad);
@@ -191,7 +197,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                 }
                 else
                 {
-                    Utils.RaiseEventForAll(RaiseEventsCode.FinishedThrowing);
+                    Utils.RaiseEventForMaster(RaiseEventsCode.FinishedThrowing);
                 }
                 break;
             case (byte)RaiseEventsCode.FinishRollSeven:
@@ -219,6 +225,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                 {
                     InitCard(cardName);
                 }
+                playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
                 EndRobberPlacement();
                 break;
             case (byte)RaiseEventsCode.CompleteTrade:
@@ -261,25 +268,42 @@ public class CardManager : MonoBehaviourPunCallbacks
     }
 
 
-    public void setCardsColliders(bool flag)
-    {
-        foreach(Card card in resourcesHand)
-            card.SetClicks(flag);
-        foreach(Card card in commodityHand)
-            card.SetClicks(flag);
-    }
-
-
     #region Build Related
 
     public void AllowBuild(int buildOption)
     {
         eBuildAction buildAction = (eBuildAction)buildOption + 1;
         eBuilding building = (eBuilding)buildOption + 1;
-        if (buildManager.buildingAmounts[building] == 0) return;
+        if(buildManager.buildingAmounts[building] > 0)
+            CheckPrice(buildOption, buildAction);
+        else
+            buildManager.CleanUp();
+    }
+
+    public void AllowUpgrde()
+    {
+        eBuildAction buildAction = eBuildAction.UpgradeKnight;
+        bool checkKnightLevel3 = buildManager.CanBuildKnightsLvl3 && buildManager.buildingAmounts[eBuilding.Knight3] > 0;
+        if ((buildManager.buildingAmounts[eBuilding.Knight2] > 0) || checkKnightLevel3)
+            CheckPrice(5, buildAction);
+        else
+            buildManager.CleanUp();
+    }
+    public void AllowKnightActivation()
+    {
+        eBuildAction buildAction = eBuildAction.ActivateKnight;
+        CheckPrice(6, buildAction);
+    }
+
+    private void CheckPrice(int buildOption, eBuildAction buildAction)
+    {
         if (CheckPriceInHand(Consts.Prices[buildAction]))
         {
             buildManager.ButtonHandler(buildOption);
+        }
+        else
+        {
+            buildManager.CleanUp();
         }
     }
 
@@ -295,9 +319,10 @@ public class CardManager : MonoBehaviourPunCallbacks
         {
             for(int i=0; i< commodityPrices[commodity]; i++)
                 RemoveCardFromHandByType(commodityNum);
-            
 
-            improveButtons[commodityNum - 5].text = string.Format("Level: {0}", commodityPrices[commodity].ToString());
+            string level = commodityPrices[commodity].ToString();
+            improveButtons[commodityNum - 5].text = string.Format("Level: {0}", level);
+            playerSetup.playerPanel.photonView.RPC("SetCommodityText", RpcTarget.AllBufferedViaServer, commodityNum - 5, level);
             
             commodityPrices[commodity] += 1;
             switch (commodityPrices[commodity])
@@ -356,6 +381,7 @@ public class CardManager : MonoBehaviourPunCallbacks
                 Destroy(card.gameObject);
             }
         }
+        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
     }
 
     #endregion
@@ -438,9 +464,10 @@ public class CardManager : MonoBehaviourPunCallbacks
         cardsToThorw.Clear();
         state = eCardsState.None;
         throwCardsPanel.SetActive(false);
-        setCardsColliders(false);
+        SetMainPanelActive(false);
         playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
-        Utils.RaiseEventForAll(RaiseEventsCode.FinishedThrowing);
+        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+        Utils.RaiseEventForMaster(RaiseEventsCode.FinishedThrowing);
 
     }
 
@@ -459,6 +486,7 @@ public class CardManager : MonoBehaviourPunCallbacks
             else
                 InitCard(resource);
         }
+        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
     }
 
     public void AddCardsToCache(Tile tile, int vertexID)
@@ -472,6 +500,7 @@ public class CardManager : MonoBehaviourPunCallbacks
             else
                 cachedRollCards.Add(resource);
         }
+        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
     }
 
     public void AddCardToHand(Card card)
@@ -494,6 +523,7 @@ public class CardManager : MonoBehaviourPunCallbacks
         resourceCount[resourceCard.resource] += 1;
         if (setParent)
             resourceCard.transform.SetParent(resourceCardsPanel.transform);
+        SortResourceHand();
     }
 
     public void AddCommodityCardToHand(CommodityCard commodityCard, bool setParent)
@@ -502,6 +532,7 @@ public class CardManager : MonoBehaviourPunCallbacks
         commodityCount[commodityCard.commodity] += 1;
         if (setParent)
             commodityCard.transform.SetParent(commodityCardsPanel.transform);
+        SortCommodityHand();
     }
 
     public void RemoveResourceCardFromHand(ResourceCard resourceCard)
@@ -517,7 +548,6 @@ public class CardManager : MonoBehaviourPunCallbacks
         commodityCount[commodityCard.commodity] -= 1;
         Destroy(commodityCard.gameObject);
     }
-
 
     public void RemoveCardFromHandByType(int cardType)
     {
@@ -549,21 +579,47 @@ public class CardManager : MonoBehaviourPunCallbacks
         }
     }
 
-
     public void AddCardToHandPanel(Card card)
     {
         if (Utils.IsResourceCard(card))
+        {
             card.transform.SetParent(resourceCardsPanel.transform);
+            SortResourceHand();
+        }
         else
+        {
             card.transform.SetParent(commodityCardsPanel.transform);
+            SortCommodityHand();
+        }
     }
 
     public void PickCard(int resource)
     {
         pickCardPanel.SetActive(false);
         InitCard(resource);
+        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
         playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
         Utils.RaiseEventForMaster(RaiseEventsCode.FinishPickCard);
+    }
+
+    private void SortResourceHand()
+    {
+        resourcesHand.Sort((r1, r2) => r1.resource.CompareTo(r2.resource));
+        for (int i = 0; i < resourcesHand.Count; i++)
+            resourcesHand[i].transform.SetSiblingIndex(i);
+    }
+
+    private void SortCommodityHand()
+    {
+        commodityHand.Sort((c1, c2) => c1.commodity.CompareTo(c2.commodity));
+        for (int i = 0; i < commodityHand.Count; i++)
+            commodityHand[i].transform.SetSiblingIndex(i);
+    }
+
+    public void SetMainPanelActive(bool flag)
+    {
+        mainPanel.interactable = flag;
+        mainPanel.blocksRaycasts = flag;
     }
 
     #endregion
@@ -644,6 +700,7 @@ public class CardManager : MonoBehaviourPunCallbacks
             ResourceCard resourceCard = resourcesHand[chosen];
             int resource = (int)resourceCard.resource;
             RemoveResourceCardFromHand(resourceCard);
+            playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
             return resource;
         }
         else
@@ -652,6 +709,7 @@ public class CardManager : MonoBehaviourPunCallbacks
             CommodityCard commodityCard = commodityHand[chosen];
             int commodity = (int)commodityCard.commodity;
             RemoveCommodityCardFromHand(commodityCard);
+            playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
             return commodity;
         }
     }
@@ -698,6 +756,7 @@ public class CardManager : MonoBehaviourPunCallbacks
         }
         cardsToGet.Clear();
         ClearCurrentTrade();
+        ClearOffers();
     }
 
     public void AddToGet(int type)
@@ -764,7 +823,6 @@ public class CardManager : MonoBehaviourPunCallbacks
         makeOfferButton.gameObject.SetActive(false);
     }
 
-
     public void CheckMakeOfferButton()
     {
         bankButton.gameObject.SetActive(false);
@@ -801,6 +859,8 @@ public class CardManager : MonoBehaviourPunCallbacks
         cardsToGet.Clear();
 
         ClearCurrentTrade();
+        ClearOffers();
+        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
     }
 
 
@@ -861,12 +921,16 @@ public class CardManager : MonoBehaviourPunCallbacks
         }
 
         InitCards(new List<int>(cardsToAdd));
+        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
     }
 
 
     public void ClearOffers()
     {
-        foreach(GameObject offer in offers)
+        if(offers.Count > 0)
+            offers[0].GetComponent<OfferPanel>().cancelPanel.SetActive(false);
+
+        foreach (GameObject offer in offers)
         {
             PhotonNetwork.Destroy(offer);
         }

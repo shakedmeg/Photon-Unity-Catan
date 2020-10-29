@@ -32,8 +32,12 @@ public class Edge : MonoBehaviourPun
     #endregion
 
 
+    public int owner;
+
+
     #region Properties
 
+    public Road road;
 
     public int Id { get; private set; }
 
@@ -81,9 +85,13 @@ public class Edge : MonoBehaviourPun
                 p1 = new Vector3(transform.position.x, Consts.DROP_HIGHET, transform.position.z);
                 p0 = new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z);
                 GameObject roadGameObject = PhotonNetwork.Instantiate(roadPrefab.name, p1, angle, 0, data);
-                Road road = roadGameObject.GetComponent<Road>();
+                road = roadGameObject.GetComponent<Road>();
                 road.InitDrop(p1, p0);
                 UpdateEdges();
+                photonView.RPC("SetOwner", RpcTarget.AllBufferedViaServer, PhotonNetwork.LocalPlayer.ActorNumber);
+
+                buildManager.buildingAmounts[eBuilding.Road] -= 1;
+                buildManager.playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, 0, buildManager.buildingAmounts[eBuilding.Road].ToString());
                 
                 if (GameManager.instance.state == GameState.SetupSettlement || GameManager.instance.state == GameState.SetupCity)
                 {
@@ -129,6 +137,13 @@ public class Edge : MonoBehaviourPun
         playerSetup = PlayerSetup.LocalPlayerInstance.GetComponent<PlayerSetup>();
         buildManager = GameManager.instance.playerGameObject.GetComponent<BuildManager>();
         cardManager = GameManager.instance.playerGameObject.GetComponent<CardManager>();
+    }
+
+
+    [PunRPC]
+    void SetOwner(int ownerID)
+    {
+        owner = ownerID;
     }
 
     #endregion

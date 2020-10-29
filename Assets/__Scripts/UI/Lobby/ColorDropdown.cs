@@ -7,7 +7,6 @@ public class ColorDropdown : Dropdown
 {
 
     private int optionsIndex = 0;
-    public bool allowChange = false;
 
     protected override GameObject CreateDropdownList(GameObject template)
     {

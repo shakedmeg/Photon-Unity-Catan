@@ -134,7 +134,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fallTime: 0.5
-  cColl: {fileID: 0}
 --- !u!136 &2435975826192285942
 CapsuleCollider:
   m_ObjectHideFlags: 0

@@ -6,6 +6,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
 using System;
+using System.Linq;
 
 public class BuildManager : MonoBehaviourPun
 {
@@ -22,7 +23,7 @@ public class BuildManager : MonoBehaviourPun
     private CardManager cardManager;
     private TurnManager turnManager;
 
-    private Dictionary<int, string> buttonHandlers = new Dictionary<int, string>() 
+    private Dictionary<int, string> buttonHandlers = new Dictionary<int, string>()
     {
         { 0, Consts.BuildRoad },
         { 1, Consts.BuildSettlement },
@@ -71,6 +72,7 @@ public class BuildManager : MonoBehaviourPun
     public Dictionary<int, Vertex> FreeKnights { get; private set; } = new Dictionary<int, Vertex>();
 
     public Dictionary<int, Vertex> PlayerBuildings { get; private set; } = new Dictionary<int, Vertex>();
+    public int settlementsInGame = 0;
     public int cityCount = 0;
 
     public Dictionary<int, Edge> PlayerRoads { get; private set; } = new Dictionary<int, Edge>();
@@ -79,8 +81,9 @@ public class BuildManager : MonoBehaviourPun
 
     public Dictionary<int, Vertex> RivalsBuildingVertexes { get; private set; } = new Dictionary<int, Vertex>();
     public Dictionary<int, Vertex> RivalsKnights { get; private set; } = new Dictionary<int, Vertex>();
+    public Dictionary<int, Edge> RivalRoads { get; private set; } = new Dictionary<int, Edge>();
 
-    public Dictionary<eCommodity, int> improveCityViewID = new Dictionary<eCommodity, int>() 
+    public Dictionary<eCommodity, int> improveCityViewID = new Dictionary<eCommodity, int>()
     {
         { eCommodity.Coin, -1 },
         { eCommodity.Paper, -1 },
@@ -99,11 +102,11 @@ public class BuildManager : MonoBehaviourPun
 
     public int displacedKnightPervId;
 
-
+    public List<Vertex> settlements = new List<Vertex>();
     public List<Vertex> regularCities = new List<Vertex>();
 
 
-    public Dictionary<eBuilding, int> buildingAmounts = new Dictionary<eBuilding, int>() 
+    public Dictionary<eBuilding, int> buildingAmounts = new Dictionary<eBuilding, int>()
     {
         { eBuilding.Road, 15 },
         { eBuilding.Settlement, 5 },
@@ -209,12 +212,13 @@ public class BuildManager : MonoBehaviourPun
                 if (!photonView.IsMine) return;
                 data = (object[])photonEvent.CustomData;
                 notifyToPlayer = photonEvent.Sender;
-                DisplaceKnight((int) data[0]);
+                DisplaceKnight((int)data[0]);
                 break;
             case (byte)RaiseEventsCode.FinishMoveKnight:
                 if (!photonView.IsMine) return;
-                turnManager.SetButtonsAndKnightsControl(true);
+                turnManager.SetControl(true);
                 data = (object[])photonEvent.CustomData;
+                knightToMove.TurnOffKnight();
                 if (FreeVertexes.ContainsKey((int)data[0])) FreeVertexes[(int)data[0]].MoveKnight();
                 if (FreeKnights.ContainsKey((int)data[0])) FreeKnights[(int)data[0]].MoveKnight();
                 break;
@@ -251,6 +255,16 @@ public class BuildManager : MonoBehaviourPun
                 data = (object[])photonEvent.CustomData;
                 GetTilesWithDiceNumber((string)data[0], false);
                 break;
+            case (byte)RaiseEventsCode.DeactivateAllKnights:
+                if (!photonView.IsMine) return;
+                foreach (Vertex vertex in PlayerKnights.Values)
+                    if (vertex.knight.Activated)
+                        vertex.knight.TurnOffKnight();
+                break;
+            case (byte)RaiseEventsCode.CheckRoads:
+                if (!photonView.IsMine) return;
+                CalcLongestRoad();
+                break;
         }
 
     }
@@ -271,7 +285,7 @@ public class BuildManager : MonoBehaviourPun
 
         bool desertFound = false;
         string key;
-        for(int i = 0; i<Consts.NumOfTiles; i++)
+        for (int i = 0; i < Consts.NumOfTiles; i++)
         {
             Tile tile = PhotonView.Find(tilesIDs[i]).gameObject.GetComponent<Tile>();
             tiles.Add(tile);
@@ -280,8 +294,8 @@ public class BuildManager : MonoBehaviourPun
                 continue;
             }
 
-            key = desertFound? Consts.Probabilitiys[i - 1] : Consts.Probabilitiys[i];
-            
+            key = desertFound ? Consts.Probabilitiys[i - 1] : Consts.Probabilitiys[i];
+
             if (probNumberTile.ContainsKey(key))
             {
                 probNumberTile[key].Add(tile);
@@ -304,7 +318,7 @@ public class BuildManager : MonoBehaviourPun
 
     public void UpdateVertexes(int[] toRemove, int id, int sender)
     {
-        if (!photonView.IsMine) return; 
+        if (!photonView.IsMine) return;
         Vertex vertex;
         for (int i = 0; i < toRemove.Length; i++)
         {
@@ -334,7 +348,14 @@ public class BuildManager : MonoBehaviourPun
         Edge edge;
         edge = RemoveIfExist(FreeEdges, edgeID);
         if (edge != null && PhotonNetwork.LocalPlayer.ActorNumber == sender)
+        {
             PlayerRoads.Add(edgeID, edge);
+            CalcLongestRoad();
+        }
+        else
+        {
+            RivalRoads.Add(edgeID, edge);
+        }
 
     }
 
@@ -348,18 +369,26 @@ public class BuildManager : MonoBehaviourPun
         if (knight == null) knight = RemoveIfExist(FreeVertexes, knightID);
 
         if (PhotonNetwork.LocalPlayer.ActorNumber == sender)
+        {
             PlayerKnights.Add(knightID, knight);
+            UpdateLongestRoad(knight);
+        }
         else
+        {
             RivalsKnights.Add(knightID, knight);
+        }
     }
 
     void RemoveKnight(int knightIDToRemove, int sender)
     {
         if (!photonView.IsMine) return;
         Vertex knightToRemove;
-        
+
         if (PhotonNetwork.LocalPlayer.ActorNumber == sender)
+        {
             knightToRemove = RemoveIfExist(PlayerKnights, knightIDToRemove);
+            UpdateLongestRoad(knightToRemove);
+        }
         else
             knightToRemove = RemoveIfExist(RivalsKnights, knightIDToRemove);
 
@@ -378,7 +407,7 @@ public class BuildManager : MonoBehaviourPun
             FreeVertexes.Add(knightIDToRemove, knightToRemove);
         else
             FreeKnights.Add(knightIDToRemove, knightToRemove);
-    
+
     }
 
 
@@ -453,7 +482,7 @@ public class BuildManager : MonoBehaviourPun
     #region Functions Called From Tiles, Vertexs and Edges
 
 
-    public void TurnOffValuesFromDict<T>(Dictionary<int, T> d, IEnumerable<int> valuesToTurnOff) where T: Component
+    public void TurnOffValuesFromDict<T>(Dictionary<int, T> d, IEnumerable<int> valuesToTurnOff) where T : Component
     {
         foreach (int id in valuesToTurnOff)
         {
@@ -509,7 +538,6 @@ public class BuildManager : MonoBehaviourPun
         }
 
         cardManager.InitCards(resources);
-        cardManager.setCardsColliders(false);
 
     }
 
@@ -532,7 +560,7 @@ public class BuildManager : MonoBehaviourPun
             if (PlayerRoads.ContainsKey(edgeID))
             {
                 Edge edge = PlayerRoads[edgeID];
-                foreach(int optinalVertex in edge.Vertexes)
+                foreach (int optinalVertex in edge.Vertexes)
                 {
                     if (vistiedVertexes.Contains(optinalVertex)) continue;
 
@@ -574,7 +602,6 @@ public class BuildManager : MonoBehaviourPun
             {
                 Knight rivalKnight = RivalsKnights[knightOptionsID].knight;
                 rivalKnight.InitScaleUpDown(rivalKnight.transform.localScale, Consts.ScaleKnight);
-                rivalKnight.SetCollider(true);            
             }
         }
 
@@ -582,22 +609,27 @@ public class BuildManager : MonoBehaviourPun
     }
 
 
-    public void StopScalingCities(List<Vertex> cities)
+    public void StopScalingBuildings(List<Vertex> buildings, eBuilding building)
     {
-        foreach (Vertex vertex in cities)
-            vertex.City.StopScaling();
-        cities.Clear();
+        foreach (Vertex vertex in buildings)
+        {
+            if (building == eBuilding.City)
+                vertex.City.StopScaling();
+            else
+                vertex.settlement.StopScaling();
+        }
+        buildings.Clear();
     }
 
-    public void StopScalingKnights(bool turnOffCollider)
+
+    public void StopScalingKnights()
     {
         foreach (int knightID in knightsToTurnOff)
         {
             Knight knight = PlayerKnights[knightID].knight;
-            if (turnOffCollider)
-                if(!knight.Activated)
-                    knight.SetCollider(false);
             knight.StopScaling();
+            if (knight.Useable)
+                knight.SetCollider(true);
         }
     }
 
@@ -613,24 +645,18 @@ public class BuildManager : MonoBehaviourPun
 
     #endregion
 
-
-
-
-
-
-
     #region Functions Called From Buttons
 
     public void ButtonHandler(int buildOption)
     {
-        if(Build != eBuildAction.None)
+        if (Build != eBuildAction.None)
         {
             int oldBuild = (int)Build - 1;
             buttons[oldBuild].enabled = true;
             Invoke(buttonCleanUps[oldBuild], 0);
         }
 
-        Build = (eBuildAction)buildOption+1;
+        Build = (eBuildAction)buildOption + 1;
         buttons[buildOption].enabled = false;
         cancelButton.gameObject.SetActive(true);
         Invoke(buttonHandlers[buildOption], 0);
@@ -653,7 +679,7 @@ public class BuildManager : MonoBehaviourPun
         {
             int[] vertexNeighbors = edge.Vertexes;
             HashSet<int> neighborEdges = new HashSet<int>(edge.NeighborEdges);
-            for (int i = 0; i<vertexNeighbors.Length; i++)
+            for (int i = 0; i < vertexNeighbors.Length; i++)
             {
                 if (RivalsBuildingVertexes.ContainsKey(vertexNeighbors[i]))
                 {
@@ -672,7 +698,8 @@ public class BuildManager : MonoBehaviourPun
         SetActiveValuesInDict(FreeEdges, openEdgesToDisplay);
 
         edgesToTurnOff = openEdgesToDisplay;
-
+        if (edgesToTurnOff.Count == 0)
+            CleanUp();
     }
 
     public void BuildSettlement()
@@ -681,7 +708,7 @@ public class BuildManager : MonoBehaviourPun
 
         HashSet<int> openVertexesToDisplay = new HashSet<int>();
 
-        foreach(Edge edge in PlayerRoads.Values)
+        foreach (Edge edge in PlayerRoads.Values)
         {
             openVertexesToDisplay.UnionWith(edge.Vertexes);
         }
@@ -691,44 +718,47 @@ public class BuildManager : MonoBehaviourPun
         SetActiveValuesInDict(FreeVertexes, openVertexesToDisplay);
 
         vertexesToTurnOff = openVertexesToDisplay;
+        if (vertexesToTurnOff.Count == 0)
+            CleanUp();
     }
 
     public void BuildCity()
     {
         Build = eBuildAction.City;
-        List<int> settlements = new List<int>();
+        List<Vertex> settlements = new List<Vertex>();
 
-        foreach (KeyValuePair<int, Vertex> entry in PlayerBuildings)
+        foreach (Vertex vertex in PlayerBuildings.Values)
         {
-            if (entry.Value.Building == eBuilding.Settlement)
+            if (vertex.Building == eBuilding.Settlement)
             {
-                settlements.Add(entry.Key);
+                vertex.settlement.InitScaleUpDown(Consts.SettlementRegularScale, Consts.ScaleSettlement);
+                settlements.Add(vertex);
             }
         }
-
-        SetActiveValuesInDict(PlayerBuildings, settlements);
-
-        vertexesToTurnOff = new HashSet<int>(settlements);
+        this.settlements = settlements;
+        
+        if (this.settlements.Count == 0)
+            CleanUp();
 
     }
 
     public void BuildWall()
     {
         Build = eBuildAction.Wall;
-        List<int> cities = new List<int>();
+        List<Vertex> cities = new List<Vertex>();
 
-        foreach (KeyValuePair<int, Vertex> entry in PlayerBuildings)
+        foreach (Vertex vertex in PlayerBuildings.Values)
         {
-            Vertex vertex = entry.Value;
-            if (vertex.Building == eBuilding.City && !vertex.HasWall)
+            if (vertex.Building == eBuilding.City && !vertex.City.HasWall)
             {
-                cities.Add(entry.Key);
+                cities.Add(vertex);
+                vertex.City.InitScaleUpDown(Consts.CityRegularScale, Consts.ScaleCity);
             }
         }
 
-        SetActiveValuesInDict(PlayerBuildings, cities);
-
-        vertexesToTurnOff = new HashSet<int>(cities);
+        regularCities = cities;
+        if (regularCities.Count == 0)
+            CleanUp();
     }
 
     public void BuildKnight()
@@ -744,7 +774,7 @@ public class BuildManager : MonoBehaviourPun
                 if (FreeVertexes.ContainsKey(vertex))
                 {
                     freeVertexesToDisplay.Add(vertex);
-                }else if (FreeKnights.ContainsKey(vertex))
+                } else if (FreeKnights.ContainsKey(vertex))
                 {
                     knightsVertexesToDisplay.Add(vertex);
                 }
@@ -756,6 +786,8 @@ public class BuildManager : MonoBehaviourPun
 
         vertexesToTurnOff = freeVertexesToDisplay;
         knightsToTurnOff = knightsVertexesToDisplay;
+        if (knightsToTurnOff.Count == 0 && vertexesToTurnOff.Count == 0)
+            CleanUp();
 
     }
 
@@ -766,41 +798,52 @@ public class BuildManager : MonoBehaviourPun
         foreach (KeyValuePair<int, Vertex> entry in PlayerKnights)
         {
             Knight knight = entry.Value.knight;
-            if (entry.Value.Building == eBuilding.Knight || ( entry.Value.Building == eBuilding.Knight2 && CanBuildKnightsLvl3))
+            if (entry.Value.Building == eBuilding.Knight || (entry.Value.Building == eBuilding.Knight2 && CanBuildKnightsLvl3))
             {
-
                 knight.InitScaleUpDown(knight.transform.localScale, Consts.ScaleKnight);
-                knight.SetCollider(true);
                 optionalKnights.Add(entry.Key);
             }
-            knightsToTurnOff = optionalKnights;
         }
+        knightsToTurnOff = optionalKnights;
+        if (knightsToTurnOff.Count == 0)
+            CleanUp();
     }
-    
+
     public void ActivateKnight()
     {
         Build = eBuildAction.ActivateKnight;
 
         HashSet<int> optionalKnights = new HashSet<int>();
-        foreach(KeyValuePair<int, Vertex> entry in PlayerKnights)
+        foreach (KeyValuePair<int, Vertex> entry in PlayerKnights)
         {
             Knight knight = entry.Value.knight;
             if (!knight.Activated)
             {
-                Vector3 s1 = knight.Level > 2? Consts.ScaleKnight3 : Consts.ScaleKnight;
+                Vector3 s1 = knight.Level > 2 ? Consts.ScaleKnight3 : Consts.ScaleKnight;
 
                 knight.InitScaleUpDown(knight.transform.localScale, s1);
-                knight.SetCollider(true);
                 optionalKnights.Add(entry.Key);
             }
-
-            knightsToTurnOff = optionalKnights;
         }
+        knightsToTurnOff = optionalKnights;
+        if (knightsToTurnOff.Count == 0)
+            CleanUp();
     }
 
 
     public void CleanUp()
     {
+        if (KnightAction == eKnightActions.TakeAction)
+        {
+            TurnOffKnightOptions();
+            cardManager.robber.StopScaling();
+            knightToMove.SetCollider(true);
+            KnightAction = eKnightActions.None;
+            cancelButton.gameObject.SetActive(false);
+            turnManager.SetControl(true);
+        }
+
+        if (Build == eBuildAction.None) return;
         int buildOption = (int)Build - 1;
         buttons[buildOption].enabled = true;
         Invoke(buttonCleanUps[buildOption], 0);
@@ -820,15 +863,13 @@ public class BuildManager : MonoBehaviourPun
 
     public void CityCleanUp()
     {
-        TurnOffValuesFromDict(PlayerBuildings, vertexesToTurnOff);
-        vertexesToTurnOff.Clear();
+        StopScalingBuildings(settlements, eBuilding.Settlement);
     }
     public void WallCleanUp()
     {
-        TurnOffValuesFromDict(PlayerBuildings, vertexesToTurnOff);
-        vertexesToTurnOff.Clear();
+        StopScalingBuildings(regularCities, eBuilding.City);
     }
-    public void KnightCleanUp() 
+    public void KnightCleanUp()
     {
         TurnOffValuesFromDict(FreeVertexes, vertexesToTurnOff);
         vertexesToTurnOff.Clear();
@@ -838,15 +879,13 @@ public class BuildManager : MonoBehaviourPun
     public void UpgradeKnightCleanUp()
     {
         if (knightsToTurnOff == null) return;
-        StopScalingKnights(false);
-        //TurnOffValuesFromDict(PlayerKnights, knightsToTurnOff);
+        StopScalingKnights();
         knightsToTurnOff.Clear();
     }
     public void ActivateKnightCleanUp()
     {
         if (knightsToTurnOff == null) return;
-        StopScalingKnights(true);
-        //TurnOffValuesFromDict(PlayerKnights, knightsToTurnOff);
+        StopScalingKnights();
         knightsToTurnOff.Clear();
     }
 
@@ -856,14 +895,14 @@ public class BuildManager : MonoBehaviourPun
 
 
     #region Barbarians Attack And City Improvements
-   
-    
+
+
     public int CountUnimprovedCities()
     {
         regularCities.Clear();
-        foreach(Vertex vertex in PlayerBuildings.Values)
+        foreach (Vertex vertex in PlayerBuildings.Values)
         {
-            if(vertex.Building == eBuilding.City)
+            if (vertex.Building == eBuilding.City)
             {
                 if (!vertex.City.Improved)
                     regularCities.Add(vertex);
@@ -873,6 +912,177 @@ public class BuildManager : MonoBehaviourPun
     }
     #endregion
 
+    #region Make Knights Useable
+    public void SetUsableKnights()
+    {
+        foreach (Vertex vertex in PlayerKnights.Values)
+        {
+            if (vertex.knight.Activated && !vertex.knight.Useable)
+            {
+                vertex.knight.Useable = true;
+            }
+        }
+    }
+    #endregion
+
+    #region LongestRoad
+
+    private List<HashSet<int>> DivideRoadsToSets()
+    {
+        List<HashSet<int>> roadSets = new List<HashSet<int>>();
+        HashSet<int> seenEdges = new HashSet<int>();
+        foreach (Edge edge in PlayerRoads.Values)
+        {
+            if (seenEdges.Contains(edge.Id)) continue;
+            HashSet<int> newRoadSet = new HashSet<int>();
+            newRoadSet.Add(edge.Id);
+            seenEdges.Add(edge.Id);
+            BranchFromEdge(edge, seenEdges, newRoadSet);
+            roadSets.Add(newRoadSet);
+
+        }
+        return roadSets;
+    }
+
+    private void BranchFromEdge(Edge edge, HashSet<int> seenEdges, HashSet<int> newRoadSet)
+    {
+        foreach(int vertexID in edge.Vertexes)
+        {
+            if (RivalsBuildingVertexes.ContainsKey(vertexID) || RivalsKnights.ContainsKey(vertexID))
+                continue;
+            
+            foreach(int edgeID in GetVertex(vertexID).Edges)
+            {
+                if(PlayerRoads.ContainsKey(edgeID) && !seenEdges.Contains(edgeID))
+                {
+                    newRoadSet.Add(edgeID);
+                    seenEdges.Add(edgeID);
+                    BranchFromEdge(PlayerRoads[edgeID], seenEdges, newRoadSet);
+                }
+            }
+        }
+    }
+
+    private HashSet<int> GetOneWayRoads(HashSet<int> roadSet)
+    {
+        HashSet<int> oneWayRoads = new HashSet<int>();
+        foreach(int edgeID in roadSet)
+        {
+            bool foundOneSide = false;
+            bool foundTwoSide = false;
+            foreach(int vertexID in PlayerRoads[edgeID].Vertexes)
+            {
+                if (RivalsBuildingVertexes.ContainsKey(vertexID) || RivalsKnights.ContainsKey(vertexID))
+                {
+                    oneWayRoads.Add(edgeID);
+                    break;
+                }
+                foreach(int vertexEdgeID in GetVertex(vertexID).Edges)
+                {
+                    if (vertexEdgeID == edgeID) continue;
+
+                    if(PlayerRoads.ContainsKey(vertexEdgeID))
+                    {
+                        if (foundOneSide)
+                        {
+                            foundTwoSide = true;
+                            break;
+                        }
+                        else
+                        {
+                            foundOneSide = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if(!foundOneSide || (foundOneSide && !foundTwoSide))
+                oneWayRoads.Add(edgeID);
+        }
+        return oneWayRoads;
+    }
+
+    public void CalcLongestRoad()
+    {
+        int longest = 0;
+        List<HashSet<int>> roadSets = DivideRoadsToSets();
+        foreach(HashSet<int> roadSet in roadSets)
+        {
+            HashSet<int> oneWayRoads = GetOneWayRoads(roadSet);
+            int curr = oneWayRoads.Count == 0 ? CalcLongestPath(roadSet) : CalcLongestPath(oneWayRoads);
+            if (curr > longest)
+                longest = curr;
+        }
+        playerSetup.playerPanel.photonView.RPC("SetLongestRoadText", RpcTarget.AllBufferedViaServer, longest.ToString());
+        Utils.RaiseEventForMaster(RaiseEventsCode.SetLongestRoad, new object[] { longest });
+    }
+
+    private int CalcLongestPath(HashSet<int> roads)
+    {
+        int longest = 0;
+        foreach (int edgeID in roads)
+        {
+            HashSet<int> seenEdges = new HashSet<int>() { edgeID };
+            int curr = CalcLongestPathHelper(edgeID, ref seenEdges);
+            if (curr > longest)
+                longest = curr;
+        }
+        return longest;
+    }
+
+    private int CalcLongestPathHelper(int edgeID, ref HashSet<int> seenEdges, int cameFromVertex =-1)
+    {
+        int longest = 1;
+        foreach (int vertexID in PlayerRoads[edgeID].Vertexes)
+        {
+            if (cameFromVertex != -1 && cameFromVertex == vertexID) continue;
+            if (!RivalsBuildingVertexes.ContainsKey(vertexID) && !RivalsKnights.ContainsKey(vertexID))
+            {
+                foreach (int vertexEdgeID in GetVertex(vertexID).Edges)
+                {
+                    if (seenEdges.Contains(vertexEdgeID) || !PlayerRoads.ContainsKey(vertexEdgeID)) continue;
+
+                    seenEdges.Add(vertexEdgeID);
+                    int curr = 1 + CalcLongestPathHelper(vertexEdgeID, ref seenEdges, vertexID);
+                    if (curr > longest)
+                        longest = curr;
+                }
+            }
+        }
+        return longest;
+    }
+
+
+    public Vertex GetVertex(int vertexID)
+    {
+        if (FreeVertexes.ContainsKey(vertexID))
+            return FreeVertexes[vertexID];
+        else if (FreeKnights.ContainsKey(vertexID))
+            return FreeKnights[vertexID];
+        else if (PlayerBuildings.ContainsKey(vertexID))
+            return PlayerBuildings[vertexID];
+        else
+            return PlayerKnights[vertexID];
+    }
+
+
+
+
+    private void UpdateLongestRoad(Vertex knight)
+    {
+        HashSet<int> playersNear = new HashSet<int>();
+        foreach (int edgeID in knight.Edges)
+        {
+            if (RivalRoads.ContainsKey(edgeID))
+            {
+                playersNear.Add(RivalRoads[edgeID].owner);
+            }
+        }
+        Utils.RaiseEventForGroup(RaiseEventsCode.CheckRoads, playersNear.ToArray());
+    }
+
+    #endregion
 
 
     #region RPC's
@@ -900,7 +1110,7 @@ public class BuildManager : MonoBehaviourPun
     }
 
 
-    private void AddIfAbsent<T>(Dictionary<int, T> d, int key, T go)where T: Component
+    private void AddIfAbsent<T>(Dictionary<int, T> d, int key, T go) where T : Component
     {
         if (!d.ContainsKey(key))
         {
@@ -908,7 +1118,7 @@ public class BuildManager : MonoBehaviourPun
         }
     }
 
-    private T RemoveIfExist<T>(Dictionary<int, T> d, int key) where T: Component
+    private T RemoveIfExist<T>(Dictionary<int, T> d, int key) where T : Component
     {
         if (d.ContainsKey(key))
         {

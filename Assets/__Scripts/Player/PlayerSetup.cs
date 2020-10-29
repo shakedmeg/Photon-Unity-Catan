@@ -1,10 +1,13 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using Photon.Pun;
 using ExitGames.Client.Photon;
+using UnityEngine.SceneManagement;
 
-public class PlayerSetup : MonoBehaviourPun
+
+public class PlayerSetup : MonoBehaviourPunCallbacks
 {
     public static GameObject LocalPlayerInstance;
 
@@ -15,6 +18,13 @@ public class PlayerSetup : MonoBehaviourPun
     public GameObject playerPanelPrefab;
 
     public PlayerPanel playerPanel;
+
+    //public GameObject gameOverPanel;
+
+    //public Text winnerNameText;
+
+    //public Button EndGameButton;
+
 
     void Awake()
     {
@@ -33,17 +43,17 @@ public class PlayerSetup : MonoBehaviourPun
 
         // #Critical
         // we flag as don't destroy on load so that instance survives level synchronization, thus giving a seamless experience when levels load.
-        DontDestroyOnLoad(gameObject);
+        // DontDestroyOnLoad(gameObject);
     }
 
 
 
-    private void OnEnable()
+    public override void OnEnable()
     {
         PhotonNetwork.NetworkingClient.EventReceived += OnEvent;
     }
 
-    private void OnDisable()
+    public override void OnDisable()
     {
         PhotonNetwork.NetworkingClient.EventReceived -= OnEvent;
     }
@@ -63,6 +73,15 @@ public class PlayerSetup : MonoBehaviourPun
                 data = (object[])photonEvent.CustomData;
                 if (!photonView.IsMine) return;
                 playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, (bool)data[0]);
+                break;
+            case (byte)RaiseEventsCode.AddPoints:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, (int)data[0]);
+                break;
+            case (byte)RaiseEventsCode.GameOver:
+                if (!photonView.IsMine) return;
+                canvas.gameObject.SetActive(false);
                 break;
         }
     }

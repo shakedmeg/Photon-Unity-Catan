@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
+
 public class Card : MonoBehaviour, IPointerDownHandler
 {
 
@@ -10,6 +11,7 @@ public class Card : MonoBehaviour, IPointerDownHandler
     private bool toThorw = false;
     public bool toTrade = false;
     public bool IsInGetList { get; set; } = false;
+
 
     void Awake ()
     {
@@ -77,10 +79,4 @@ public class Card : MonoBehaviour, IPointerDownHandler
                 break;
         }
     }
-
-    public void SetClicks(bool flag)
-    {
-        enabled = flag;
-    }
-
 }

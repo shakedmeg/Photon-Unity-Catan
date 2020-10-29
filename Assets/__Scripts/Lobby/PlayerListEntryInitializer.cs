@@ -5,7 +5,6 @@ using UnityEngine.UI;
 using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
-using System;
 
 public class PlayerListEntryInitializer : MonoBehaviour
 {
@@ -33,7 +32,7 @@ public class PlayerListEntryInitializer : MonoBehaviour
         if (opResponse.OperationCode == OperationCode.SetProperties &&
             opResponse.ReturnCode == ErrorCode.InvalidOperation)
         {
-            Debug.Log(opResponse.DebugMessage);
+            Debug.LogError(opResponse.DebugMessage);
             // CAS failure
             // we will assign color again
         }
@@ -42,6 +41,7 @@ public class PlayerListEntryInitializer : MonoBehaviour
 
     public void Initialize(int playerID, string playerName)
     {
+
         PlayerNameText.text = playerName;
         PlayerColorDropdown.AddOptions(Consts.COLORS_DROPDOWN);
 
@@ -74,10 +74,6 @@ public class PlayerListEntryInitializer : MonoBehaviour
                 ExitGames.Client.Photon.Hashtable newProps = new ExitGames.Client.Photon.Hashtable() { { Consts.PLAYER_READY, isPlayerReady } };
                 PhotonNetwork.LocalPlayer.SetCustomProperties(newProps);
             });
-
-
-
-
         }
     }
 
@@ -115,11 +111,20 @@ public class PlayerListEntryInitializer : MonoBehaviour
         object owner;
         PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(Consts.COLORS_OWNER,out owner);
         int currentOwner = (int)owner;
+
         ExitGames.Client.Photon.Hashtable customRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.ROOM_COLORS, allowedColors.ToArray() }, { Consts.COLORS_OWNER, PhotonNetwork.LocalPlayer.ActorNumber } };
-        ExitGames.Client.Photon.Hashtable expectedCustomRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.COLORS_OWNER, currentOwner } };
-        PhotonNetwork.CurrentRoom.SetCustomProperties(customRoomProperties, expectedCustomRoomProperties);
+        if(currentOwner != -1)
+        {
+            ExitGames.Client.Photon.Hashtable expectedCustomRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.COLORS_OWNER, currentOwner } };
+            PhotonNetwork.CurrentRoom.SetCustomProperties(customRoomProperties, expectedCustomRoomProperties);
 
+        }
+        else
+        {
+            PhotonNetwork.CurrentRoom.SetCustomProperties(customRoomProperties);
+        }
 
+        Debug.LogError(colorName);
         // assign color to the player custom properties and dropdown value
         int value = -1;
         switch (colorName)
@@ -141,6 +146,8 @@ public class PlayerListEntryInitializer : MonoBehaviour
                 break;
         }
 
+        Debug.LogError("Player " + PhotonNetwork.LocalPlayer.ActorNumber);
+
         ExitGames.Client.Photon.Hashtable initialProps = new ExitGames.Client.Photon.Hashtable() { { Consts.PLAYER_COLOR, colorName } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(initialProps);
 
@@ -151,6 +158,7 @@ public class PlayerListEntryInitializer : MonoBehaviour
 
     public void SetColorForOthers(string color)
     {
+        PlayerColorDropdown.value = Utils.Name_To_Index(color);
         PlayerColorDropdown.transform.GetChild(0).GetComponent<Text>().text = color;
         PlayerColorDropdown.transform.GetChild(3).GetComponent<Image>().color = Utils.Name_To_Color(color);
     }
@@ -166,41 +174,11 @@ public class PlayerListEntryInitializer : MonoBehaviour
     /// </summary>
     public void DropDownSetColor()
     {
-        if (!PlayerColorDropdown.allowChange)
-        {
-            PlayerColorDropdown.allowChange = true;
-            return;
-        }
-
         string colorName = "";
         Color color = Color.clear;
         Image image = PlayerColorDropdown.transform.GetChild(3).GetComponent<Image>();
         Utils.Set_Color_And_Name(PlayerColorDropdown.value, ref colorName, ref color);
         
-        //switch (PlayerColorDropdown.value)
-        //{
-        //    case 0:
-        //        colorName = Consts.YELLOW;
-        //        color = Color.yellow ;
-        //        break;
-        //    case 1:
-        //        colorName = Consts.RED;
-        //        color = Color.red ;
-        //        break;
-        //    case 2:
-        //        colorName = Consts.BLUE;
-        //        color = Color.blue ;
-        //        break;
-        //    case 3:
-        //        colorName = Consts.WHITE;
-        //        color = Color.white ;
-        //        break;
-        //    case 4:
-        //        colorName = Consts.BLACK;
-        //        color = Color.black ;
-        //        break;
-        //}
-
 
         object playerData;
         PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(Consts.PLAYER_COLOR, out playerData);
@@ -216,8 +194,18 @@ public class PlayerListEntryInitializer : MonoBehaviour
             PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(Consts.COLORS_OWNER, out owner);
             int currentOwner = (int)owner;
             ExitGames.Client.Photon.Hashtable customRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.ROOM_COLORS, allowedColors.ToArray() }, { Consts.COLORS_OWNER, PhotonNetwork.LocalPlayer.ActorNumber } };
-            ExitGames.Client.Photon.Hashtable expectedCustomRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.COLORS_OWNER, currentOwner } };
-            PhotonNetwork.CurrentRoom.SetCustomProperties(customRoomProperties, expectedCustomRoomProperties);
+            Debug.LogError("Hunt this " + currentOwner);
+            if (currentOwner != -1)
+            {
+                ExitGames.Client.Photon.Hashtable expectedCustomRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.COLORS_OWNER, currentOwner } };
+                PhotonNetwork.CurrentRoom.SetCustomProperties(customRoomProperties, expectedCustomRoomProperties);
+
+            }
+            else
+            {
+                PhotonNetwork.CurrentRoom.SetCustomProperties(customRoomProperties);
+            }
+
 
             ExitGames.Client.Photon.Hashtable customProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.PLAYER_COLOR, colorName } };
             PhotonNetwork.LocalPlayer.SetCustomProperties(customProperties);
@@ -225,17 +213,7 @@ public class PlayerListEntryInitializer : MonoBehaviour
         }
         else
         {
-            PlayerColorDropdown.allowChange = false;
-            //PlayerColorDropdown.transform.GetChild(0).GetComponent<Text>().text = (string)playerData;
             PlayerColorDropdown.value = Utils.Name_To_Index((string)playerData);
         }
-
-
     }
-
-
-
-
-
-    
 }

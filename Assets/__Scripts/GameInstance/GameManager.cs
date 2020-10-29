@@ -3,9 +3,12 @@ using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 
-public class GameManager : MonoBehaviourPun
+
+public class GameManager : MonoBehaviourPunCallbacks
 {
     public static GameManager instance;
 
@@ -17,9 +20,14 @@ public class GameManager : MonoBehaviourPun
 
     public Player[] players;
 
-    public bool[] finishedThrowing;
+    public GameObject canvas;
+
+    public Text winnerNameText;
+
 
     private int currentPlayer;
+
+    private int[] playerActorIDs;
 
     private int preGameCounter = 0;
     private int gameCounter;
@@ -31,22 +39,25 @@ public class GameManager : MonoBehaviourPun
         { eCommodity.Silk, new int[]{-1, 4} },
     };
 
-    public int CurrentPlayer { get { return currentPlayer; } }
+    private Dictionary<int,int> playerLongestRoads = new Dictionary<int, int>();
+    private int playerHoldingLongestRoad = -1;
+
+    private eLongestRoadState longestRoadState = eLongestRoadState.Game;
+    private List<int> tiedRoadPlayers = new List<int>();
+    private int tiedRoadsToPass;
+
+    public int CurrentPlayer { get { return playerActorIDs[currentPlayer]; } }
 
     void Awake()
     {
-        if (instance == null)
+        instance = this;
+        players = PhotonNetwork.PlayerList;
+        playerActorIDs = new int[players.Length];
+        for (int i = 0; i<players.Length; i++)
         {
-            instance = this;
-            players = PhotonNetwork.PlayerList;
-            finishedThrowing = new bool[players.Length];
+            playerLongestRoads.Add(players[i].ActorNumber, 0);
+            playerActorIDs[i] = players[i].ActorNumber;
         }
-        else
-        {
-            Destroy(gameObject);
-        }
-
-        DontDestroyOnLoad(gameObject);
     }
 
     void Start()
@@ -59,13 +70,15 @@ public class GameManager : MonoBehaviourPun
 
 
 
-    private void OnEnable()
+    public override void OnEnable()
     {
+        base.OnEnable();
         PhotonNetwork.NetworkingClient.EventReceived += OnEvent;
     }
 
-    private void OnDisable()
+    public override void OnDisable()
     {
+        base.OnDisable();
         PhotonNetwork.NetworkingClient.EventReceived -= OnEvent;
     }
 
@@ -90,14 +103,14 @@ public class GameManager : MonoBehaviourPun
                     switch (state)
                     {
                         case GameState.SetupSettlement:
-                            Utils.RaiseEventForPlayer(RaiseEventsCode.PreSetupSettlement, currentPlayer);
+                            Utils.RaiseEventForPlayer(RaiseEventsCode.PreSetupSettlement, CurrentPlayer);
                             break;
 
                         case GameState.SetupCity:
-                            Utils.RaiseEventForPlayer(RaiseEventsCode.PreSetupCity, currentPlayer);
+                            Utils.RaiseEventForPlayer(RaiseEventsCode.PreSetupCity, CurrentPlayer);
                             break;
                         default:
-                            Utils.RaiseEventForPlayer(RaiseEventsCode.StartTurn, currentPlayer);
+                            Utils.RaiseEventForPlayer(RaiseEventsCode.StartTurn, CurrentPlayer);
                             break;
                     }
                 }
@@ -106,30 +119,13 @@ public class GameManager : MonoBehaviourPun
                     switch (state)
                     {
                         case GameState.SetupCity:
-                            Utils.RaiseEventForPlayer(RaiseEventsCode.PreSetupCity, currentPlayer);
+                            Utils.RaiseEventForPlayer(RaiseEventsCode.PreSetupCity, CurrentPlayer);
                             break;
 
                         case GameState.Friendly:
-                            Utils.RaiseEventForPlayer(RaiseEventsCode.StartTurn, currentPlayer);
+                            Utils.RaiseEventForPlayer(RaiseEventsCode.StartTurn, CurrentPlayer);
                             break;
                     }
-                }
-                break;
-            case (byte)RaiseEventsCode.SevenRolled:
-                for (int i = 0; i < finishedThrowing.Length; i++)
-                {
-                    finishedThrowing[i] = false;
-                }
-                break;
-            case (byte)RaiseEventsCode.FinishedThrowing:
-                finishedThrowing[photonEvent.Sender - 1] = true;
-                foreach (bool finish in finishedThrowing)
-                {
-                    if (!finish) return;
-                }
-                if (PhotonNetwork.LocalPlayer.ActorNumber == photonEvent.Sender)
-                {
-                    Utils.RaiseEventForPlayer(RaiseEventsCode.FinishRollSeven, currentPlayer);
                 }
                 break;
             case (byte)RaiseEventsCode.CheckImporveCity:
@@ -148,15 +144,24 @@ public class GameManager : MonoBehaviourPun
                 }
                 else if(cityImprovementHolder[commodity][1] < improvementLevel)
                 {
+                    Utils.RaiseEventForPlayer(RaiseEventsCode.LoseImproveCity, cityImprovementHolder[commodity][0], new object[] { data[0] });
                     cityImprovementHolder[commodity][0] = photonEvent.Sender;
                     cityImprovementHolder[commodity][1] = improvementLevel;
                     Utils.RaiseEventForPlayer(RaiseEventsCode.TakeImproveCity, photonEvent.Sender, new object[] { data[0] });
-                    Utils.RaiseEventForPlayer(RaiseEventsCode.LoseImproveCity, photonEvent.Sender, new object[] { data[0] });
                 }
                 break;
             case (byte)RaiseEventsCode.ActivateRobber:
                 state = GameState.Playing;
                 break;
+            case (byte)RaiseEventsCode.SetLongestRoad:
+                data = (object[])photonEvent.CustomData;
+                HandleLongestRoad((int)data[0], photonEvent.Sender);
+                break;
+            case (byte)RaiseEventsCode.GameOver:
+                data = (object[])photonEvent.CustomData;
+                GameOver((string)data[0], (string)data[1]);
+                break;
+
         }
 
     }
@@ -177,18 +182,18 @@ public class GameManager : MonoBehaviourPun
             }
             else if (preGameCounter < PhotonNetwork.CurrentRoom.PlayerCount)
             {
-                currentPlayer = (currentPlayer % PhotonNetwork.CurrentRoom.PlayerCount) + 1;
+                currentPlayer = ( (currentPlayer + 1) % PhotonNetwork.CurrentRoom.PlayerCount);
             }
             else if (preGameCounter > PhotonNetwork.CurrentRoom.PlayerCount)
             {
                 currentPlayer -= 1;
-                if (currentPlayer == 0) currentPlayer = PhotonNetwork.CurrentRoom.PlayerCount;
+                if (currentPlayer == -1) currentPlayer = PhotonNetwork.CurrentRoom.PlayerCount - 1;
             }
         }
         else
         {
             gameCounter += 1;
-            currentPlayer = (currentPlayer % PhotonNetwork.CurrentRoom.PlayerCount) + 1;
+            currentPlayer = ((currentPlayer + 1) % PhotonNetwork.CurrentRoom.PlayerCount);
             if (gameCounter == 2 * PhotonNetwork.CurrentRoom.PlayerCount)
             {
                 state = GameState.PreAttack;
@@ -202,15 +207,121 @@ public class GameManager : MonoBehaviourPun
     {
         SetStartingPlayer();
 
-        Utils.RaiseEventForPlayer(RaiseEventsCode.PreSetupSettlement, currentPlayer);
+        Utils.RaiseEventForPlayer(RaiseEventsCode.PreSetupSettlement, CurrentPlayer);
     }
 
 
 
     public void SetStartingPlayer()
     {
-        currentPlayer = Random.Range(0, PhotonNetwork.CurrentRoom.PlayerCount) + 1;
+        currentPlayer = Random.Range(0, PhotonNetwork.CurrentRoom.PlayerCount);
 
         Utils.RaiseEventForAll(RaiseEventsCode.SetRandomPlayer, new object[] { currentPlayer });
     }
+
+
+    public void HandleLongestRoad(int roadLength, int sender)
+    {
+        int oldLength = playerLongestRoads[sender];
+        playerLongestRoads[sender] = roadLength;
+        if (roadLength <= 4)
+            return;
+
+        switch (longestRoadState)
+        {
+            case eLongestRoadState.Game:
+                longestRoadState = eLongestRoadState.Player;
+                playerHoldingLongestRoad = sender;
+                Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, sender, new object[] { 2 });
+                break;
+
+            case eLongestRoadState.Player:
+                if (playerHoldingLongestRoad == sender)
+                {
+                    if (roadLength < oldLength)
+                        RoadShorten(sender);
+                }
+                else
+                {
+                    if (roadLength > playerLongestRoads[playerHoldingLongestRoad])
+                    {
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, playerHoldingLongestRoad, new object[] { -2 });
+                        playerHoldingLongestRoad = sender;
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, sender, new object[] { 2 });
+                    }
+                }
+                break;
+            case eLongestRoadState.Tie:
+                if(roadLength > tiedRoadsToPass)
+                {
+                    playerHoldingLongestRoad = sender;
+                    longestRoadState = eLongestRoadState.Player;
+                    Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, sender, new object[] { 2 });
+                }
+                break;
+        }
+    }
+
+
+    private void RoadShorten(int sender)
+    {
+        int maxLength = 5;
+        foreach (KeyValuePair<int, int> entry in playerLongestRoads)
+        {
+            if (entry.Value > maxLength)
+            {
+                tiedRoadPlayers.Clear();
+                tiedRoadPlayers.Add(entry.Key);
+            }
+            else if (entry.Value == maxLength)
+            {
+                tiedRoadPlayers.Add(entry.Key);
+            }
+        }
+        if(tiedRoadPlayers.Count == 0)
+        {
+            Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, playerHoldingLongestRoad, new object[] { -2 });
+            longestRoadState = eLongestRoadState.Game;
+        }
+        else if (tiedRoadPlayers.Count == 1)
+        {
+            if (tiedRoadPlayers[0] != playerHoldingLongestRoad)
+            {
+                Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, playerHoldingLongestRoad, new object[] { -2 });
+
+                playerHoldingLongestRoad = tiedRoadPlayers[0];
+                Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, sender, new object[] { 2 });
+            }
+            tiedRoadPlayers.Clear();
+        }
+        else
+        {
+            Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, playerHoldingLongestRoad, new object[] { -2 });
+            longestRoadState = eLongestRoadState.Tie;
+            tiedRoadsToPass = maxLength;
+            tiedRoadPlayers.Clear();
+        }
+    }
+
+
+
+    public void GameOver(string playerName, string playerColor)
+    {
+        winnerNameText.text = playerName;
+        winnerNameText.color = Utils.Name_To_Color(playerColor);
+        canvas.SetActive(true);
+
+    }
+
+    public void LeaveGame()
+    {
+        PhotonNetwork.LeaveRoom();
+    }
+
+
+    public override void OnLeftRoom()
+    {
+        SceneManager.LoadScene(0);
+    }
+
 }

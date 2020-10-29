@@ -98,6 +98,8 @@ MonoBehaviour:
   fallTime: 0.5
   cityImprovementPrefab: {fileID: 2269104633041899421, guid: 83c5f6b24f5f12a418445b1c1871f1c5,
     type: 3}
+  wallPrefab: {fileID: 4873263246952775493, guid: 3229055549599cd4ba067a7c94a5c170,
+    type: 3}
 --- !u!114 &5122950713040453777
 MonoBehaviour:
   m_ObjectHideFlags: 0

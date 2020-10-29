@@ -1,18 +1,29 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Photon.Pun;
 
 public class Settlement : VertexGamePiece
 {
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
 
-    // Update is called once per frame
-    void Update()
+
+    void OnMouseDown()
     {
-        Drop();
+        StopScaling();
+        switch (Vertex.buildManager.Build)
+        {
+            case eBuildAction.City:
+                Vertex.buildManager.StopScalingBuildings(Vertex.buildManager.settlements, eBuilding.Settlement);
+                Vertex.p1 = Vertex.transform.position + new Vector3(-1, Consts.DROP_HIGHET, 0);
+                Vertex.p0 = Vertex.transform.position + new Vector3(-1, 1.25f, 0);
+                Vertex.BuildCity();
+                Vertex.playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 1);
+
+                Vertex.buildManager.cityCount += 1;
+                Vertex.turnManager.barbarians.photonView.RPC("BuildCity", RpcTarget.AllBufferedViaServer);
+                break;
+        }
+
+
     }
 }

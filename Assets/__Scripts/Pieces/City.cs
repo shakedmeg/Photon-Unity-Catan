@@ -8,11 +8,17 @@ using ExitGames.Client.Photon;
 public class City : VertexGamePiece
 {
     [SerializeField]
-    GameObject cityImprovementPrefab;
+    GameObject cityImprovementPrefab = null;
 
     CityImprovement cityImprovement;
 
-    bool wall = false;
+
+    [SerializeField]
+    private GameObject wallPrefab = null;
+
+    private Wall wall;
+
+    public bool HasWall { get; private set; }
     public bool Improved { get; internal set; } = false;
 
     private eCommodity improveType;
@@ -38,15 +44,11 @@ public class City : VertexGamePiece
                 if (improveType != (eCommodity)data[0]) return;
                 Improved = false;
                 cityImprovement = null;
+                Vertex.playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, -2);
                 break;
         }
     }
 
-    void Update()
-    {
-        Drop();
-        ScaleUpDown();
-    }
 
     void OnMouseDown()
     {
@@ -60,29 +62,63 @@ public class City : VertexGamePiece
                 Setup(ref position, ref p0, ref p1);
 
                 cityImprovement = PhotonNetwork.Instantiate(cityImprovementPrefab.name, p1, cityImprovementPrefab.transform.rotation, 0, new object[] { Utils.ECommodityToString(improveType)}).GetComponent<CityImprovement>();
-                Debug.Log(cityImprovement.photonView.ViewID);
                 Utils.RaiseEventForAll(RaiseEventsCode.SetImproveCityID, new object[] { (int)improveType, cityImprovement.photonView.ViewID });
                 cityImprovement.InitDrop(p1, p0);
+
+                Vertex.playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 2);
 
                 CleanUp();
                 break;
             case eBuildAction.TakeImprovedCity:
                 Setup(ref position, ref p0, ref p1);
 
-                Debug.Log(improveType);
-                Debug.Log(Vertex.buildManager.improveCityViewID[improveType]);
-                Debug.Log(PhotonView.Find(Vertex.buildManager.improveCityViewID[improveType]));
-
 
                 cityImprovement = PhotonView.Find(Vertex.buildManager.improveCityViewID[improveType]).GetComponent<CityImprovement>();
                 cityImprovement.photonView.TransferOwnership(PhotonNetwork.LocalPlayer.ActorNumber);
                 cityImprovement.InitDrop(p1, p0);
                 
+                Vertex.playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 2);
+                
                 CleanUp();
                 break;
             case eBuildAction.Destroy:
-                Vertex.buildManager.StopScalingCities(Vertex.buildManager.regularCities);
+                Vertex.buildManager.StopScalingBuildings(Vertex.buildManager.regularCities, eBuilding.City);
                 Vertex.DestroyCity();
+                if (HasWall)
+                {
+                    PhotonNetwork.Destroy(wall.gameObject);
+                    Vertex.cardManager.allowedCards -= 2;
+                    HasWall = false;
+                }
+                break;
+
+            case eBuildAction.Wall:
+                Vertex.buildManager.StopScalingBuildings(Vertex.buildManager.regularCities, eBuilding.City);
+                HasWall = true;
+                p1 = Vertex.transform.position + new Vector3(Consts.DropWall, 0.25f, 0);
+                p0 = Vertex.transform.position + new Vector3(0, 0.25f, 0);
+                Vector3 cityP1 = transform.position;
+                cityP1 += new Vector3(0, Consts.RaiseHighetCity, 0);
+                InitDrop(transform.position, cityP1);
+
+                if (Improved)
+                {
+                    Vector3 improvedP1 = cityImprovement.transform.position;
+                    improvedP1 += new Vector3(0, Consts.RaiseHighetCity, 0);
+                    cityImprovement.InitDrop(cityImprovement.transform.position, improvedP1);
+                }
+
+
+                
+                wall = PhotonNetwork.Instantiate(wallPrefab.name, p1, Quaternion.identity, 0, new object[] { Vertex.buildManager.playerColor }).GetComponent<Wall>();
+                wall.InitDrop(p1, p0);
+                wall.Vertex = Vertex;
+                Vertex.buildManager.buildingAmounts[eBuilding.Wall] -= 1;
+                Vertex.playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)eBuilding.Wall - 1, Vertex.buildManager.buildingAmounts[eBuilding.Wall].ToString());
+
+
+                Vertex.AfterBuild();
+                Vertex.cardManager.allowedCards += 2;
                 break;
         }
     }
@@ -90,7 +126,7 @@ public class City : VertexGamePiece
     private void Setup(ref Vector3 position, ref Vector3 p0, ref Vector3 p1)
     {
         position = transform.transform.position;
-        p0 = wall ? new Vector3(position.x + 2, 3, position.z) : new Vector3(position.x + 2, 2.5f, position.z);
+        p0 = HasWall ? new Vector3(position.x + 2, 3, position.z) : new Vector3(position.x + 2, 2.5f, position.z);
         p1 = new Vector3(position.x + 2, Consts.DROP_HIGHET, position.z);
         improveType = Vertex.buildManager.ImproveCommodity;
     }
@@ -100,6 +136,6 @@ public class City : VertexGamePiece
         Improved = true;
         Vertex.buildManager.Build = eBuildAction.None;
         Vertex.buildManager.ImproveCommodity = eCommodity.None;
-        Vertex.buildManager.StopScalingCities(Vertex.buildManager.regularCities);
+        Vertex.buildManager.StopScalingBuildings(Vertex.buildManager.regularCities, eBuilding.City);
     }
 }

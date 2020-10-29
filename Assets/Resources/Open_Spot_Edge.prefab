@@ -148,3 +148,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   roadPrefab: {fileID: 4832858418759618591, guid: 5b4fb193c4eb99b4b84efea66d197b07,
     type: 3}
+  owner: 0
+  road: {fileID: 0}

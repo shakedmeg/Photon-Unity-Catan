@@ -9,36 +9,31 @@ public class Robber : TileGamePiece
     private CardManager cardManager;
     private BuildManager buildManager;
 
-    public CapsuleCollider cColl;
+    //public CapsuleCollider cColl;
 
     public override void Awake()
     {
-        cColl = GetComponent<CapsuleCollider>();
+        coll = GetComponent<CapsuleCollider>();
         object[] data = photonView.InstantiationData;
         GameObject tile = PhotonView.Find((int)data[0]).gameObject;
         transform.SetParent(tile.transform);
         transform.position = tile.transform.position + Consts.RobberLocalPosition;
         Tile = tile.GetComponent<Tile>();
     }
-    // Start is called before the first frame update
-    void Start()
-    {
-
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        Drop();
-        ScaleUpDown();
-    }
 
     void OnMouseDown() 
     {
+        buildManager.cancelButton.SetActive(false);
         photonView.TransferOwnership(PhotonNetwork.LocalPlayer.ActorNumber);
-        cColl.enabled = false;
+        coll.enabled = false;
         StopScaling();
-        buildManager.knightToMove.TurnOffKnight();
+        if (buildManager.knightToMove != null)
+        {
+            buildManager.knightToMove.TurnOffKnight();
+            buildManager.TurnOffKnightOptions();
+            buildManager.knightToMove = null;
+        }
+
         cardManager.StartRob();
     }
 
@@ -47,6 +42,11 @@ public class Robber : TileGamePiece
     {
         base.StopScaling();
         transform.localScale = Consts.RobberRegularScale;
+    }
+
+    public void SetCollider(bool flag)
+    {
+        coll.enabled = flag;
     }
 
 

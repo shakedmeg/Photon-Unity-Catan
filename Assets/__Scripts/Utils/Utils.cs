@@ -21,13 +21,10 @@ public class Utils
             case Consts.BLACK:
                 return Color.black;
             case Consts.CoinDevelopment:
-                Debug.LogFormat("Return here {0}", Consts.CoinDevelopmentColor);
                 return Consts.CoinDevelopmentColor;
             case Consts.PaperDevelopment:
-                Debug.LogFormat("Return here {0}", Consts.CoinDevelopmentColor);
                 return Consts.PaperDevelopmentColor;
             case Consts.SilkDevelopment:
-                Debug.LogFormat("Return here {0}", Consts.CoinDevelopmentColor);
                 return Consts.SilkDevelopmentColor;
         }
         return Color.clear;

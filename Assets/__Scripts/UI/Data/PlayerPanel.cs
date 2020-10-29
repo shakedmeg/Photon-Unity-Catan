@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Photon.Pun;
 using ExitGames.Client.Photon;
-
+using Photon.Realtime;
 
 public class PlayerPanel : MonoBehaviourPun
 {
@@ -24,6 +24,9 @@ public class PlayerPanel : MonoBehaviourPun
 
     [SerializeField]
     private Text numOfCards = null;
+    
+    [SerializeField]
+    private Text longestRoad = null;
 
     [SerializeField]
     private Text[] commoditysTexts = null;
@@ -36,25 +39,26 @@ public class PlayerPanel : MonoBehaviourPun
 
     private const string PickAResource = "Picking a Resource";
     private const string ThrowingCards = "Throwing Cards";
-    private const string LosingCity = "Choosing City To Loose";
+    private const string LosingCity = "Losing City";
 
     private Color32 goodColor = new Color32(54, 166, 0, 255);
     private Color32 badColor = new Color32(205,0,0,255);
     private Color32 defaultColor = new Color(1,1,1,1);
 
     private int points = 0;
-    private int coinLevel = 0;
-    private int paperLevel = 0;
-    private int silkLevel = 0;
 
     private const string pointsString = "Points {0}";
     private const string level = "Level: {0}";
+    private const string numOfCardsInHand = "#Cards: {0}";
+
+    private string playerColor; 
 
     void Awake()
     {
         object[] data = photonView.InstantiationData;
-        foreach(GameObject go in buildings)
-            SetColor(Utils.Name_To_Color((string)data[0]), go.GetComponent<MeshRenderer>(), go);
+        playerColor = (string)data[0];
+        foreach (GameObject go in buildings)
+            SetColor(Utils.Name_To_Color(playerColor), go.GetComponent<MeshRenderer>(), go);
         playerName.text = photonView.Owner.NickName;
     }
 
@@ -115,7 +119,8 @@ public class PlayerPanel : MonoBehaviourPun
 
         if (points >= 13)
         {
-            Debug.Log("We Have a Winner!!");
+            if (photonView.IsMine)
+                Utils.RaiseEventForAll(RaiseEventsCode.GameOver, new object[] { PhotonNetwork.LocalPlayer.NickName, playerColor } );
         }
     }
 
@@ -128,12 +133,18 @@ public class PlayerPanel : MonoBehaviourPun
     [PunRPC]
     public void SetCommodityText(int type, string amount)
     {
-        commoditysTexts[type].text = amount;
+        commoditysTexts[type].text = string.Format(level, amount);
     }
 
     [PunRPC]
     public void SetNumOfCardsText(string amount)
     {
-        numOfCards.text = amount;
+        numOfCards.text = string.Format(numOfCardsInHand, amount);
+    }
+
+    [PunRPC]
+    public void SetLongestRoadText(string amount)
+    {
+        longestRoad.text = amount;
     }
 }

@@ -5,6 +5,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
 using UnityEngine.UI;
+using System.Linq;
 
 public class TurnManager : MonoBehaviourPun
 {
@@ -16,7 +17,10 @@ public class TurnManager : MonoBehaviourPun
     private CardManager cardManager;
 
     [SerializeField]
-    private Button endTurnButton;
+    private Button endTurnButton = null;
+
+    public bool[] finishedThrowing;
+
     #endregion
 
 
@@ -42,6 +46,8 @@ public class TurnManager : MonoBehaviourPun
 
     void Awake()
     {
+        if (PhotonNetwork.IsMasterClient)
+            finishedThrowing = new bool[GameManager.instance.players.Length];
 
         if (photonView.IsMine)
         {
@@ -78,7 +84,8 @@ public class TurnManager : MonoBehaviourPun
                 break;
             case (byte)RaiseEventsCode.StartTurn:
                 if (!photonView.IsMine) return;
-                Dice.SetCollider(true);
+                Dice.InitScaleUpDown(Consts.DiceRegularScale, Consts.ScaleDice);
+                buildManager.SetUsableKnights();
                 break;
             case (byte)RaiseEventsCode.ActivateBarbarians:
                 if (!photonView.IsMine) return;
@@ -88,6 +95,18 @@ public class TurnManager : MonoBehaviourPun
             case (byte)RaiseEventsCode.GainTurnControl:
                 if (!photonView.IsMine) return;
                 GainControl();
+                break;
+            case (byte)RaiseEventsCode.SevenRolled:
+                if (!PhotonNetwork.IsMasterClient) return;
+                for (int i = 0; i < finishedThrowing.Length; i++)
+                    finishedThrowing[i] = false;
+                break;
+            case (byte)RaiseEventsCode.FinishedThrowing:
+                if (!photonView.IsMine) return;
+                finishedThrowing[photonEvent.Sender - 1] = true;
+                foreach (bool finish in finishedThrowing)
+                    if (!finish) return;
+                Utils.RaiseEventForPlayer(RaiseEventsCode.FinishRollSeven, GameManager.instance.CurrentPlayer);
                 break;
         }
     }
@@ -103,20 +122,16 @@ public class TurnManager : MonoBehaviourPun
     public void GainControl()
     {
         if (!photonView.IsMine) return;
-        ButtonsPanel.gameObject.SetActive(true);
-        endTurnButton.gameObject.SetActive(true);
-        SetKnightsCollider(true);
-        cardManager.setCardsColliders(true);
+        SetControl(true);
     }
 
     public void PassTurn()
     {
         if (!photonView.IsMine) return;
-        Dice.SetCollider(false);
         endTurnButton.gameObject.SetActive(false);
         SetKnightsCollider(false);
 
-        cardManager.setCardsColliders(false);
+        cardManager.SetMainPanelActive(false);
         cardManager.CloseTrade();
         cardManager.ClearOffers();
         ButtonsPanel.gameObject.SetActive(false);
@@ -126,10 +141,13 @@ public class TurnManager : MonoBehaviourPun
     }
 
 
-    public void SetButtonsAndKnightsControl(bool flag)
+    public void SetControl(bool flag)
     {
-        SetButtons(flag);
+        endTurnButton.gameObject.SetActive(flag);
+        ButtonsPanel.gameObject.SetActive(flag);
         SetKnightsCollider(flag);
+        cardManager.SetMainPanelActive(flag);
+
     }
 
 

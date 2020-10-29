@@ -20,6 +20,8 @@ public class Knight : VertexGamePiece
 
     public int Level { get; private set; }
 
+    public bool Useable { get; set; }
+
     public override void Awake()
     {
         base.Awake();
@@ -37,30 +39,25 @@ public class Knight : VertexGamePiece
         if (data.Length > 1)
         {
             Activated = (bool) data[1];
+            Useable = (bool)data[3];
             if (Activated)
             {
                 bColl.enabled = true;
                 ChangeHeadColor(true);
+                if (photonView.IsMine)
+                    turnManager.barbarians.photonView.RPC("ActivateKnight", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, 1);
             }
             Level = (int)data[2];
-
         }
     }
-
-    // Update is called once per frame
-    void Update()
-    {
-        Drop();
-        ScaleUpDown();
-    }
-
 
     void OnMouseDown()
     {
         if (buildManager.Build == eBuildAction.UpgradeKnight)
         {
             Vertex.UpgradeKnight();
-            buildManager.StopScalingKnights(false);
+            buildManager.StopScalingKnights();
+            
         }
         else
         {
@@ -79,6 +76,7 @@ public class Knight : VertexGamePiece
                 switch (buildManager.KnightAction)
                 {
                     case eKnightActions.None:
+                        if (!Useable) return;
                         buildManager.knightToMove = this;
                         HashSet<int> vertexes = buildManager.CalcKnightsActionsOptions(buildManager.PlayerKnights[Vertex.ID], new HashSet<int>(), new HashSet<int>(), true);
                         bool canMoveRobber = buildManager.CheckIfKnightCanMoveRobber(Vertex.Tiles);
@@ -86,23 +84,35 @@ public class Knight : VertexGamePiece
 
                         if (vertexes.Count == 0 && !canMoveRobber) 
                             return;
+
+                        SetCollider(false);
                         buildManager.KnightAction = eKnightActions.TakeAction;
                         if (vertexes.Count != 0)
                             buildManager.ShowKnightsActionsOptions(vertexes);
                         if (canMoveRobber)
                         {
-                            cardManager.robber.cColl.enabled = true;
                             cardManager.robber.InitScaleUpDown(Consts.RobberRegularScale, Consts.ScaleRobber);
                         }
+
+                        buildManager.cancelButton.SetActive(true);
+                        turnManager.SetControl(false);
                         break;
 
                     case eKnightActions.TakeAction:
-                        buildManager.knightToMove.TurnOffKnight();
-                        SetCollider(false);
+                        buildManager.cancelButton.SetActive(false);
+                        //buildManager.knightToMove.TurnOffKnight();
                         StopScaling();
-                        data = new object[] { Vertex.ID };
+
+
                         buildManager.TurnOffKnightOptions();
-                        turnManager.SetButtonsAndKnightsControl(false);
+
+                        // Verify here robber may not have been set!
+
+                        cardManager.robber.StopScaling();
+                        turnManager.SetControl(false);
+
+
+                        data = new object[] { Vertex.ID };
                         Utils.RaiseEventForPlayer(RaiseEventsCode.DisplaceKnight, this.photonView.Owner.ActorNumber, data);
                         break;
 
@@ -127,9 +137,10 @@ public class Knight : VertexGamePiece
     public void TurnOffKnight()
     {
         Activated = false;
+        Useable = false;
         SetCollider(false);
         this.photonView.RPC("ChangeHeadColor", RpcTarget.AllBufferedViaServer, false);
-        //ChangeHeadColor(playerColor);
+        turnManager.barbarians.photonView.RPC("DeactivateKnight", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, Level);
     }
 
     public override void StopScaling()

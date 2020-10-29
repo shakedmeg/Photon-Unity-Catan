@@ -18,14 +18,17 @@ public enum ePorts { p2To1=2, p3To1, p4To1 };
 
 public enum eResponses { None, True, False };
 
+public enum eLongestRoadState { Game, Tie, Player}
+
 public enum RaiseEventsCode
 {
     // GameManager
     SetRandomPlayer = 1,
     PassTurn,
-    FinishedThrowing,
     CheckImporveCity,
     ActivateRobber,
+    SetLongestRoad,
+
 
 
 
@@ -48,15 +51,18 @@ public enum RaiseEventsCode
     SetImproveCityID,
     TakeImproveCity,
     CheckIfNeedToPick,
+    DeactivateAllKnights,
+    CheckRoads,
 
 
     // TurnManager
     StartTurn,
     ActivateBarbarians,
     GainTurnControl,
+    FinishedThrowing,
 
     // CardManager
-    SevenRolled,
+    SevenRolled,            // TurnManager
     FinishRollSeven,
     LoseCard,
     TakeCard,
@@ -71,9 +77,13 @@ public enum RaiseEventsCode
     AddGreenPlayer,
     GreenPlayerResponse,
     FinishPickCard,
+    SendDiceScore,
+
 
     // PlayerSetup
     SetPlayerPanel,
+    AddPoints,
+    GameOver,
 
 
 }
@@ -186,9 +196,15 @@ public class Consts
 
     public static Vector3 RobberRegularScale { get; } = new Vector3(0.173f, 0.2f, 2f);
     public static Vector3 ScaleRobber { get; } = new Vector3(0.2f, 0.25f, 2.2f);
-
+    
+    public static Vector3 SettlementRegularScale { get; } = Vector3.one;
+    public static Vector3 ScaleSettlement { get; } = new Vector3(1.4f, 1.4f, 1.4f);    
     public static Vector3 CityRegularScale { get; } = new Vector3(1f, 1f, 1.25f);
     public static Vector3 ScaleCity { get; } = new Vector3(1.3f, 1.3f, 1.5f);
+
+    public static Vector3 DiceRegularScale { get; } = new Vector3(32.4f, 32.4f, 32.4f);
+    public static Vector3 ScaleDice { get; } = new Vector3(38, 38, 38);
+
 
     #endregion
 

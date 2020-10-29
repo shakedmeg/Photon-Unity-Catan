@@ -49,7 +49,9 @@ public class Barbarians : MonoBehaviourPun
 
     void FinishAttack()
     {
-        dice.SendNumber(diceNumber);
+        Utils.RaiseEventForAll(RaiseEventsCode.DeactivateAllKnights);
+        Utils.RaiseEventForPlayer(RaiseEventsCode.SetPlayerPanel, GameManager.instance.CurrentPlayer, new object[] { true });
+        Utils.RaiseEventForPlayer(RaiseEventsCode.SendDiceScore, GameManager.instance.CurrentPlayer);
         photonView.RPC("Reset", RpcTarget.All);
     }
 
@@ -57,6 +59,7 @@ public class Barbarians : MonoBehaviourPun
     #region Defeat
     void AttackLost()
     {
+        Utils.RaiseEventForPlayer(RaiseEventsCode.SetPlayerPanel, GameManager.instance.CurrentPlayer, new object[] { false });
         mightNeedToLoseCity = new List<KeyValuePair<int, int>>(knightsPower.ToList());
         mightNeedToLoseCity.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
         needToLoseCurrent = 0;
@@ -111,8 +114,7 @@ public class Barbarians : MonoBehaviourPun
                 break;
         }
         if (winners.Count == 1)
-            Debug.Log("giving away a victory point");
-            //Utils.RaiseEventForPlayer(RaiseEventsCode.VictoryPoint, winners[0]);
+            Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, winners[0], new object[] { 1 });
         else
             Debug.Log("handing out development cards");
             //Utils.RaiseEventForGroup(RaiseEventsCode.DevelopmentCard, winners.ToArray());
@@ -166,6 +168,8 @@ public class Barbarians : MonoBehaviourPun
         else
         {
             rollsTillAttack.text = string.Format(RollsTillAttackFormat, 7 - slider.value);
+            if (PhotonNetwork.LocalPlayer.ActorNumber != GameManager.instance.CurrentPlayer) return;
+            dice.SendNumber(diceNumber);
         }
     }
 

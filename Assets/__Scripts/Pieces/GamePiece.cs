@@ -14,14 +14,14 @@ public class GamePiece : MonoBehaviourPun
     private bool falling = false;
     private float fallStart;
     private MeshRenderer mRend;
-    private Collider coll;
+    protected Collider coll;
 
 
     private Vector3 s0, s1;
     private bool scaling = false;
     private float scaleStart;
     private bool loopScale;
-    private Vector3 scaleToFinishAt;
+    protected Vector3 scaleToFinishAt;
 
 
     public virtual void Awake()
@@ -72,6 +72,7 @@ public class GamePiece : MonoBehaviourPun
     void Update()
     {
         Drop();
+        ScaleUpDown();
     }
 
 

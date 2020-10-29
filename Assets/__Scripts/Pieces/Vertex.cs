@@ -14,7 +14,6 @@ public class Vertex : MonoBehaviourPun
     [Header("Game Pieces")]
     public GameObject settlementPrefab;
     public GameObject cityPrefab;
-    public GameObject wallPrefab;
     public GameObject knightLvl1Prefab;
     public GameObject knightLvl2Prefab;
     public GameObject knightLvl3Prefab;
@@ -24,21 +23,21 @@ public class Vertex : MonoBehaviourPun
 
     #region Private Fields
 
+    public PlayerSetup playerSetup;
 
-    private CardManager cardManager;
+    public CardManager cardManager;
 
-    private TurnManager turnManager;
+    public TurnManager turnManager;
 
-    private Settlement settlement;
+    public Settlement settlement;
 
     private City city;
     public City City { get { return city; } }
 
-    private Wall wall;
 
 
-    private Vector3 p0;
-    private Vector3 p1;
+    public Vector3 p0;
+    public Vector3 p1;
 
     private List<object> data;
 
@@ -67,7 +66,6 @@ public class Vertex : MonoBehaviourPun
 
     public eBuilding Building { get; set; }
 
-    public bool HasWall { get; private set; }
 
     #endregion
 
@@ -109,39 +107,27 @@ public class Vertex : MonoBehaviourPun
                 else
                     BuildSettlement();
                 AddPort();
-                buildManager.playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 1);
+                buildManager.settlementsInGame += 1;
+                playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 1);
+
                 // todo add buildings under player game anchor
                 break;
 
             case eBuildAction.City:
                 p1 = transform.position + new Vector3(-1, Consts.DROP_HIGHET, 0);
                 p0 = transform.position + new Vector3(-1, 1.25f, 0);
-                if (GameManager.instance.state == GameState.SetupSettlement || GameManager.instance.state == GameState.SetupCity)
-                {
-                    photonView.RPC("SetOwner", RpcTarget.AllBufferedViaServer, PhotonNetwork.LocalPlayer.ActorNumber);
-                    PreGameBuildCity();
-                }
-                else
-                    BuildCity();
+
+                photonView.RPC("SetOwner", RpcTarget.AllBufferedViaServer, PhotonNetwork.LocalPlayer.ActorNumber);
+                PreGameBuildCity();
                 AddPort();
+                playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 2);
+                
                 buildManager.cityCount += 1;
-                buildManager.playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 1);
                 turnManager.barbarians.photonView.RPC("BuildCity", RpcTarget.AllBufferedViaServer);
                 break;
 
-            case eBuildAction.Wall:
-                HasWall = true;
-                p1 = new Vector3(transform.position.x + Consts.DropWall, transform.position.y+0.25f, transform.position.z);
-                p0 = transform.position + new Vector3(0, 0.25f, 0);
-                Vector3 cityP1 = city.transform.position;
-                cityP1 += new Vector3(0, Consts.RaiseHighetCity, 0);
-                city.InitDrop(city.transform.position, cityP1);
 
-                Build(ref wall, wallPrefab.name, Quaternion.identity,data);
-                AfterBuild();
-                cardManager.allowedCards += 2;
-                //buildManager.WallCleanUp();
-                break;
+
 
             case eBuildAction.Knight:
                 BuildKnight();
@@ -154,6 +140,8 @@ public class Vertex : MonoBehaviourPun
         switch (buildManager.KnightAction)
         {
             case eKnightActions.TakeAction:
+                buildManager.cancelButton.SetActive(false);
+                turnManager.SetControl(true);
                 buildManager.knightToMove.TurnOffKnight();
                 buildManager.TurnOffKnightOptions();
                 MoveKnight();
@@ -224,16 +212,20 @@ public class Vertex : MonoBehaviourPun
 
     }
 
-    private void BuildCity()
+    public void BuildCity()
     {
 
         PhotonNetwork.Destroy(settlement.gameObject);
         settlement = null;
 
 
-        buildManager.vertexesToTurnOff.Remove(ID);
         Build(ref city, cityPrefab.name, Quaternion.Euler(270,0,0), data, eBuilding.City);
         AfterBuild();
+
+        buildManager.settlementsInGame -= 1;
+        buildManager.buildingAmounts[eBuilding.Settlement] = buildManager.settlementsInGame >= 5 ? 0 : 5 - buildManager.settlementsInGame;
+        playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)eBuilding.Settlement - 1, buildManager.buildingAmounts[eBuilding.Settlement].ToString());
+
     }
 
 
@@ -242,12 +234,23 @@ public class Vertex : MonoBehaviourPun
         PhotonNetwork.Destroy(city.gameObject);
         p1 = transform.position + new Vector3(0, Consts.DROP_HIGHET, 0);
         p0 = transform.position + Vector3.up;
+        buildManager.buildingAmounts[eBuilding.Settlement] = buildManager.buildingAmounts[eBuilding.Settlement] == 0? 1: buildManager.buildingAmounts[eBuilding.Settlement];
         Build(ref settlement, settlementPrefab.name, Quaternion.identity, data, eBuilding.Settlement);
+
+        buildManager.settlementsInGame += 1;
+
+
         Building = eBuilding.Settlement;
         city = null;
+
+        buildManager.buildingAmounts[eBuilding.City] += 1;
+        playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)eBuilding.City - 1, buildManager.buildingAmounts[eBuilding.City].ToString());
+
         buildManager.Build = eBuildAction.None;
         buildManager.cityCount -= 1;
-        buildManager.playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+        playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, -1);
+        
         turnManager.barbarians.photonView.RPC("CityDestroyed", RpcTarget.AllBufferedViaServer, PhotonNetwork.LocalPlayer.ActorNumber);
     }
 
@@ -256,18 +259,17 @@ public class Vertex : MonoBehaviourPun
 
     #region Common Piece Helpers
 
-    private void Build<T>(ref T t, string name, Quaternion rotation, List<object> data, eBuilding building = eBuilding.None) where T : VertexGamePiece
+    public void Build<T>(ref T t, string name, Quaternion rotation, List<object> data, eBuilding building = eBuilding.None) where T : VertexGamePiece
     {
         if (building != eBuilding.None) Building = building;
         t = PhotonNetwork.Instantiate(name, p1, rotation, 0, data.ToArray()).GetComponent<T>();
         t.InitDrop(p1, p0);
         t.Vertex = this;
         buildManager.buildingAmounts[Building] -= 1;
-        Debug.Log(buildManager.buildingAmounts[Building].ToString());
-        buildManager.playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)Building-1, buildManager.buildingAmounts[Building].ToString());
+        playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)Building-1, buildManager.buildingAmounts[Building].ToString());
     }
 
-    private void AfterBuild()
+    public void AfterBuild()
     {
         cardManager.Pay();
         buildManager.CleanUp();
@@ -294,15 +296,25 @@ public class Vertex : MonoBehaviourPun
 
     public void UpgradeKnight()
     {
-        data.AddRange(new object[] { knight.Activated, knight.Level +1 });
+        data.AddRange(new object[] { knight.Activated, knight.Level +1, knight.Useable });
         p1 = transform.position + new Vector3(0, Consts.DROP_HIGHET, 0);
         p0 = transform.position + Vector3.up;
         PhotonNetwork.Destroy(knight.gameObject);
         knight = null;
         if (Building == eBuilding.Knight)
+        {
             Build(ref knight, knightLvl2Prefab.name, knightLvl2Prefab.transform.rotation, data, eBuilding.Knight2);
+            buildManager.buildingAmounts[eBuilding.Knight] += 1;
+            playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)eBuilding.Knight - 1, buildManager.buildingAmounts[eBuilding.Knight].ToString());
+        }
         else
+        {
             Build(ref knight, knightLvl3Prefab.name, knightLvl3Prefab.transform.rotation, data, eBuilding.Knight3);
+            buildManager.buildingAmounts[eBuilding.Knight2] += 1;
+            playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)eBuilding.Knight2 - 1, buildManager.buildingAmounts[eBuilding.Knight2].ToString());
+
+        }
+        AfterBuild();
         PhotonView knightPhotonView = knight.GetComponent<PhotonView>();
         photonView.RPC("SetKnight", RpcTarget.AllBufferedViaServer, knightPhotonView.ViewID);
 
@@ -329,6 +341,7 @@ public class Vertex : MonoBehaviourPun
         photonView.RPC("SetKnight", RpcTarget.AllBufferedViaServer, knightPhotonView.ViewID);
 
         buildManager.KnightAction = eKnightActions.None;
+        buildManager.knightToMove = null;
     }
 
 
@@ -360,6 +373,7 @@ public class Vertex : MonoBehaviourPun
     [PunRPC]
     void SetPlayerManagers()
     {
+        playerSetup = PlayerSetup.LocalPlayerInstance.GetComponent<PlayerSetup>();
         buildManager = GameManager.instance.playerGameObject.GetComponent<BuildManager>();
         cardManager = GameManager.instance.playerGameObject.GetComponent<CardManager>();
         turnManager = PlayerSetup.LocalPlayerInstance.GetComponent<TurnManager>();

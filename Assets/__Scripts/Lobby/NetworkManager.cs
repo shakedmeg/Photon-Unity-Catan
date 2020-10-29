@@ -141,6 +141,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public void OnStartGameButtonClicked()
     {
+        PhotonNetwork.CurrentRoom.IsOpen = false;
+
         GameObject.Find("Canvas/MainPanel/InsideRoomPanel/StartGameButton").gameObject.GetComponent<Button>().interactable = false;
         if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("gm"))
         {
@@ -152,7 +154,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             else if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsValue("b"))
             {
                 // Basic game mode
-                //PhotonNetwork.LoadLevel("DeathRaceScene");
             }
         }
     }
@@ -165,7 +166,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnConnected()
     {
-        Debug.Log("We connected to internet");
     }
 
     public override void OnConnectedToMaster()
@@ -175,19 +175,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             PhotonNetwork.JoinLobby();
         }
         ActivatePanel(RoomOptionsUIPanel.name);
-        Debug.Log(PhotonNetwork.LocalPlayer.NickName + " is connected to Photon");
     }
 
 
     public override void OnCreatedRoom()
     {
-        Debug.Log(PhotonNetwork.CurrentRoom.Name + " is created");
     }
 
     public override void OnJoinedRoom()
     {
-        Debug.Log(PhotonNetwork.LocalPlayer.NickName + " joined to " + PhotonNetwork.CurrentRoom.Name);
-
         ActivatePanel(InsideRoomUIPanel.name);
         if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("gm"))
         {
@@ -214,9 +210,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 playerListGameObjects = new Dictionary<int, GameObject>();
 
             }
-
             foreach (Player player in PhotonNetwork.PlayerList)
             {
+                Debug.LogError("Player " + player.ActorNumber);
                 GameObject playerListGameObject = Instantiate(PlayerListPrefab);
                 playerListGameObject.transform.SetParent(PlayerListContent.transform);
                 playerListGameObject.transform.localScale = Vector3.one;
@@ -227,6 +223,17 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 if (player.CustomProperties.TryGetValue(Consts.PLAYER_READY, out isPlayerReady))
                 {
                     playerListGameObject.GetComponent<PlayerListEntryInitializer>().SetPlayerReady((bool)isPlayerReady);
+                }
+
+                if(player != PhotonNetwork.LocalPlayer)
+                {
+                    object color;
+                    if (player.CustomProperties.TryGetValue(Consts.PLAYER_COLOR, out color))
+                    {
+                        Debug.LogError((string)color);
+                        playerListGameObject.GetComponent<PlayerListEntryInitializer>().SetColorForOthers((string)color);
+                    }
+
                 }
 
                 playerListGameObjects.Add(player.ActorNumber, playerListGameObject);
@@ -246,7 +253,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         foreach (RoomInfo room in roomList)
         {
-            Debug.Log(room.Name);
             if (!room.IsOpen || !room.IsVisible || room.RemovedFromList)
             {
                 if (cachedRoomList.ContainsKey(room.Name))
@@ -308,6 +314,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
+        if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers)
+            PhotonNetwork.CurrentRoom.IsVisible = false;
+
         roomInfoText.text = "Room name: " + PhotonNetwork.CurrentRoom.Name + " " +
         " Players/Max.Players: " + PhotonNetwork.CurrentRoom.PlayerCount + " / " +
         PhotonNetwork.CurrentRoom.MaxPlayers;
@@ -325,6 +334,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
+        Debug.LogError("starting leave");
+        PhotonNetwork.CurrentRoom.IsVisible = true;
         roomInfoText.text = "Room name: " + PhotonNetwork.CurrentRoom.Name + " " +
         " Players/Max.Players: " + PhotonNetwork.CurrentRoom.PlayerCount + " / " +
         PhotonNetwork.CurrentRoom.MaxPlayers;
@@ -335,6 +346,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         StartGameButton.SetActive(CheckPlayersReady());
 
         AddColor(otherPlayer);
+        Debug.LogError("ending leave");
 
     }
 
@@ -352,6 +364,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
+        Debug.LogErrorFormat("Player {0} props had been updated and his color is now {1}", targetPlayer.ActorNumber ,targetPlayer.CustomProperties[Consts.PLAYER_COLOR]);
         GameObject playerListGameObject;
         if (playerListGameObjects.TryGetValue(targetPlayer.ActorNumber, out playerListGameObject))
         {
@@ -406,8 +419,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.JoinRoom(_roomName);
     }
 
-
-
     void ClearRoomListView()
     {
         foreach (var roomListGameObject in roomListGameObjects.Values)
@@ -416,8 +427,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
         roomListGameObjects.Clear();
     }
-
-
 
     private bool CheckPlayersReady()
     {
@@ -443,8 +452,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         return true;
 
     }
-
-
 
     private void NetworkingClientOnOpResponseReceived(OperationResponse opResponse)
     {
@@ -478,6 +485,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         ExitGames.Client.Photon.Hashtable customRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.ROOM_COLORS, allowedColors.ToArray() }, { Consts.COLORS_OWNER, PhotonNetwork.LocalPlayer.ActorNumber } };
         ExitGames.Client.Photon.Hashtable expectedCustomRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.COLORS_OWNER, currentOwner } };
         PhotonNetwork.CurrentRoom.SetCustomProperties(customRoomProperties, expectedCustomRoomProperties);
+
+        Debug.LogError("Changing color after leaving for Player " + otherPlayer.ActorNumber);
+        otherPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable() { { Consts.PLAYER_COLOR, "" } });
     }
 
     #endregion

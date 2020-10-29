@@ -5,7 +5,7 @@ using UnityEngine;
 public class CancelIcon : MonoBehaviour
 {
     [SerializeField]
-    private OfferPanel offerPanel;
+    private OfferPanel offerPanel = null;
 
     void OnMouseDown()
     {

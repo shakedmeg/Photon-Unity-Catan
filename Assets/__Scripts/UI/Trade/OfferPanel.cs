@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
-using System;
-using System.Globalization;
 
 public class OfferPanel : MonoBehaviourPun
 {
@@ -101,6 +99,8 @@ public class OfferPanel : MonoBehaviourPun
         else
         {
             cardManager.offers.Remove(this.gameObject);
+            if (cardManager.offers.Count == 0)
+                cancelPanel.SetActive(false);
             PhotonNetwork.Destroy(gameObject);
         }
 
@@ -123,6 +123,8 @@ public class OfferPanel : MonoBehaviourPun
     public void CancelIconPressed()
     {
         cardManager.offers.Remove(gameObject);
+        if(cardManager.offers.Count == 0)
+            cancelPanel.SetActive(false);
         PhotonNetwork.Destroy(gameObject);
     }
 

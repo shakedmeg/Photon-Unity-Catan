@@ -150,14 +150,18 @@ MonoBehaviour:
     type: 3}
   cityPrefab: {fileID: 2400787631913067313, guid: 0afc2fa83a699a141bb3dcb665e522d8,
     type: 3}
-  wallPrefab: {fileID: 4873263246952775493, guid: 3229055549599cd4ba067a7c94a5c170,
-    type: 3}
   knightLvl1Prefab: {fileID: 8970310507741327305, guid: c540a094b2c67cf45a374b89a682abd0,
     type: 3}
   knightLvl2Prefab: {fileID: 7338141140248878184, guid: 55a0355e37c72b44db98f2e476742495,
     type: 3}
   knightLvl3Prefab: {fileID: 1458513707742737645, guid: da7ccb9b9d4ea1c4180eb83e4b3bf52c,
     type: 3}
+  playerSetup: {fileID: 0}
+  cardManager: {fileID: 0}
+  turnManager: {fileID: 0}
+  settlement: {fileID: 0}
+  p0: {x: 0, y: 0, z: 0}
+  p1: {x: 0, y: 0, z: 0}
   buildManager: {fileID: 0}
   owner: 0
   knight: {fileID: 0}
