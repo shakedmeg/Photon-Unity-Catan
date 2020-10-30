@@ -55,7 +55,6 @@ public class Tile : MonoBehaviourPun
         robber.gameObject.SetActive(true);
         robber.InitDrop(p1, p0);
         photonView.RPC("SetRobberOn", RpcTarget.AllBufferedViaServer, true);
-        robber.Tile = this;
         buildManager.TurnOffTileSpots();
         cardManager.SelectRob(Vertexes);
     }

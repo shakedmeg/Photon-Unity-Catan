@@ -60,6 +60,9 @@ public class Robber : TileGamePiece
     [PunRPC]
     public void SetParent(int parentViewID)
     {
-        transform.SetParent(PhotonView.Find(parentViewID).gameObject.transform);
+        Tile tile = PhotonView.Find(parentViewID).GetComponent<Tile>();
+        transform.SetParent(tile.gameObject.transform);
+        Tile = tile;
+        
     }
 }
