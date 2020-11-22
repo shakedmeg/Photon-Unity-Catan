@@ -93,6 +93,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             {
                 PhotonNetwork.LocalPlayer.NickName = playerName;
                 PhotonNetwork.ConnectUsingSettings();
+                //PhotonNetwork.ConnectToRegion("eu");
             }
         }
         else
@@ -212,7 +213,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             }
             foreach (Player player in PhotonNetwork.PlayerList)
             {
-                Debug.LogError("Player " + player.ActorNumber);
                 GameObject playerListGameObject = Instantiate(PlayerListPrefab);
                 playerListGameObject.transform.SetParent(PlayerListContent.transform);
                 playerListGameObject.transform.localScale = Vector3.one;
@@ -230,7 +230,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                     object color;
                     if (player.CustomProperties.TryGetValue(Consts.PLAYER_COLOR, out color))
                     {
-                        Debug.LogError((string)color);
                         playerListGameObject.GetComponent<PlayerListEntryInitializer>().SetColorForOthers((string)color);
                     }
 
@@ -334,7 +333,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
-        Debug.LogError("starting leave");
         PhotonNetwork.CurrentRoom.IsVisible = true;
         roomInfoText.text = "Room name: " + PhotonNetwork.CurrentRoom.Name + " " +
         " Players/Max.Players: " + PhotonNetwork.CurrentRoom.PlayerCount + " / " +
@@ -346,7 +344,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         StartGameButton.SetActive(CheckPlayersReady());
 
         AddColor(otherPlayer);
-        Debug.LogError("ending leave");
 
     }
 
@@ -364,7 +361,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
-        Debug.LogErrorFormat("Player {0} props had been updated and his color is now {1}", targetPlayer.ActorNumber ,targetPlayer.CustomProperties[Consts.PLAYER_COLOR]);
         GameObject playerListGameObject;
         if (playerListGameObjects.TryGetValue(targetPlayer.ActorNumber, out playerListGameObject))
         {
@@ -486,7 +482,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         ExitGames.Client.Photon.Hashtable expectedCustomRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.COLORS_OWNER, currentOwner } };
         PhotonNetwork.CurrentRoom.SetCustomProperties(customRoomProperties, expectedCustomRoomProperties);
 
-        Debug.LogError("Changing color after leaving for Player " + otherPlayer.ActorNumber);
         otherPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable() { { Consts.PLAYER_COLOR, "" } });
     }
 

@@ -8,8 +8,7 @@ public class Robber : TileGamePiece
 
     private CardManager cardManager;
     private BuildManager buildManager;
-
-    //public CapsuleCollider cColl;
+    private TurnManager turnManager;
 
     public override void Awake()
     {
@@ -33,7 +32,7 @@ public class Robber : TileGamePiece
             buildManager.TurnOffKnightOptions();
             buildManager.knightToMove = null;
         }
-
+        turnManager.SetControl(false);
         cardManager.StartRob();
     }
 
@@ -53,8 +52,9 @@ public class Robber : TileGamePiece
     [PunRPC]
     public void SetPlayerManagers()
     {
-        cardManager = GameManager.instance.playerGameObject.GetComponent<CardManager>();
-        buildManager = GameManager.instance.playerGameObject.GetComponent<BuildManager>();
+        cardManager = PlayerSetup.LocalPlayerInstance.GetComponent<CardManager>();
+        buildManager = PlayerSetup.LocalPlayerInstance.GetComponent<BuildManager>();
+        turnManager = PlayerSetup.LocalPlayerInstance.GetComponent<TurnManager>();
     }
 
     [PunRPC]
@@ -63,6 +63,5 @@ public class Robber : TileGamePiece
         Tile tile = PhotonView.Find(parentViewID).GetComponent<Tile>();
         transform.SetParent(tile.gameObject.transform);
         Tile = tile;
-        
     }
 }

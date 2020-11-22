@@ -51,13 +51,13 @@ public class BuildManager : MonoBehaviourPun
 
 
 
-    public HashSet<int> edgesToTurnOff;
+    public HashSet<int> edgesToTurnOff = new HashSet<int>();
 
-    public HashSet<int> vertexesToTurnOff;
+    public HashSet<int> vertexesToTurnOff = new HashSet<int>();
 
-    public HashSet<int> knightsToTurnOff;
+    public HashSet<int> knightsToTurnOff = new HashSet<int>();
 
-    public HashSet<int> knightsOptionsToTurnOff;
+    public HashSet<int> knightsOptionsToTurnOff = new HashSet<int>();
 
 
 
@@ -116,6 +116,7 @@ public class BuildManager : MonoBehaviourPun
         { eBuilding.Knight2, 2 },
         { eBuilding.Knight3, 2 },
     };
+
 
     #endregion
 
@@ -212,10 +213,19 @@ public class BuildManager : MonoBehaviourPun
                 if (!photonView.IsMine) return;
                 data = (object[])photonEvent.CustomData;
                 notifyToPlayer = photonEvent.Sender;
+                if (playerSetup.currentCardType == eDevelopmentCardsTypes.Intrigue)
+                {
+                    playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.DisplaceKnightIntrigue);
+                }
+                else
+                {
+                    playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.DisplaceKnight);
+                }
                 DisplaceKnight((int)data[0]);
                 break;
             case (byte)RaiseEventsCode.FinishMoveKnight:
                 if (!photonView.IsMine) return;
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, true);
                 turnManager.SetControl(true);
                 data = (object[])photonEvent.CustomData;
                 knightToMove.TurnOffKnight();
@@ -264,6 +274,32 @@ public class BuildManager : MonoBehaviourPun
             case (byte)RaiseEventsCode.CheckRoads:
                 if (!photonView.IsMine) return;
                 CalcLongestRoad();
+                break;
+            case (byte)RaiseEventsCode.ChooseKnightToLose:
+                if (!photonView.IsMine) return;
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.LoseKnight);
+                ScaleAllKnight();
+                break;
+            case (byte)RaiseEventsCode.BuildDesertedKnight:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, true);
+                BuildDesertedKnight((int)data[0], (bool)data[1]);
+                break;
+            case (byte)RaiseEventsCode.LoseRoad:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                PlayerRoads[(int)data[0]].DestroyRoad();
+                break;
+            case (byte)RaiseEventsCode.RemoveRoad:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                RemoveRoad((int)data[0], photonEvent.Sender);
+                break;
+            case (byte)RaiseEventsCode.SwitchProbs:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                SwitchProbs((int)data[0], (int)data[1]);
                 break;
         }
 
@@ -341,7 +377,6 @@ public class BuildManager : MonoBehaviourPun
         }
     }
 
-
     void UpdateEdges(int edgeID, int sender)
     {
         if (!photonView.IsMine) return;
@@ -358,7 +393,6 @@ public class BuildManager : MonoBehaviourPun
         }
 
     }
-
 
     void AddKnight(int knightID, int sender)
     {
@@ -410,7 +444,6 @@ public class BuildManager : MonoBehaviourPun
 
     }
 
-
     void MoveKnight(int knightIDToAdd, int knightIDToRemove, int sender)
     {
         if (!photonView.IsMine) return;
@@ -425,10 +458,25 @@ public class BuildManager : MonoBehaviourPun
         HashSet<int> vertexes = CalcKnightsActionsOptions(PlayerKnights[knightID], new HashSet<int>(), new HashSet<int>(), false);
         if (vertexes.Count == 0)
         {
+            if (knightToMove.Activated)
+            {
+                turnManager.barbarians.photonView.RPC("DeactivateKnight", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, knightToMove.Level);
+                playerSetup.playerPanel.photonView.RPC("SetActivatedKnightsText", RpcTarget.AllBufferedViaServer, (-1) * knightToMove.Level);
+            }
+            buildingAmounts[(eBuilding)(4 + knightToMove.Level)] += 1;
+            playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, 3 + knightToMove.Level, buildingAmounts[(eBuilding)(4 + knightToMove.Level)].ToString());
             knightToMove.Vertex.RemoveKnightFromVertex();
             Utils.RaiseEventForAll(RaiseEventsCode.RemoveKnight, new object[] { displacedKnightPervId });
             PhotonNetwork.Destroy(knightToMove.gameObject);
-            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishMoveKnight, notifyToPlayer, new object[] { displacedKnightPervId });
+            playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+            if (playerSetup.currentCardType == eDevelopmentCardsTypes.Intrigue)
+            {
+                Utils.RaiseEventForPlayer(RaiseEventsCode.FinishIntrigue, notifyToPlayer);
+            }
+            else
+            {
+                Utils.RaiseEventForPlayer(RaiseEventsCode.FinishMoveKnight, notifyToPlayer, new object[] { displacedKnightPervId });
+            }
         }
         else
         {
@@ -465,7 +513,6 @@ public class BuildManager : MonoBehaviourPun
             Utils.RaiseEventForMaster(RaiseEventsCode.GreenPlayerResponse, new object[] { cardManager.cachedRollCards.Count == 0 });
         }
     }
-
 
     public void SetImprovementViewID(eCommodity commodityType, int viewID)
     {
@@ -593,7 +640,6 @@ public class BuildManager : MonoBehaviourPun
 
     public void ShowKnightsActionsOptions(HashSet<int> knightOptionsIDs)
     {
-        //this.photonView.RPC("SetKnightAction", RpcTarget.All, eKnightActions.TakeAction);
         foreach (int knightOptionsID in knightOptionsIDs)
         {
             if (FreeVertexes.ContainsKey(knightOptionsID)) FreeVertexes[knightOptionsID].gameObject.SetActive(true);
@@ -668,6 +714,15 @@ public class BuildManager : MonoBehaviourPun
     public void BuildRoad()
     {
         Build = eBuildAction.Road;
+
+
+        edgesToTurnOff = CalcRoads();
+        if (edgesToTurnOff.Count == 0)
+            CleanUp();
+    }
+
+    public HashSet<int> CalcRoads()
+    {
         HashSet<int> openEdgesToDisplay = new HashSet<int>();
 
         foreach (Vertex vertex in PlayerBuildings.Values)
@@ -697,9 +752,7 @@ public class BuildManager : MonoBehaviourPun
 
         SetActiveValuesInDict(FreeEdges, openEdgesToDisplay);
 
-        edgesToTurnOff = openEdgesToDisplay;
-        if (edgesToTurnOff.Count == 0)
-            CleanUp();
+        return openEdgesToDisplay;
     }
 
     public void BuildSettlement()
@@ -725,6 +778,15 @@ public class BuildManager : MonoBehaviourPun
     public void BuildCity()
     {
         Build = eBuildAction.City;
+        
+        settlements = GetSettlements();
+        
+        if (this.settlements.Count == 0)
+            CleanUp();
+
+    }
+    public List<Vertex> GetSettlements()
+    {
         List<Vertex> settlements = new List<Vertex>();
 
         foreach (Vertex vertex in PlayerBuildings.Values)
@@ -735,16 +797,21 @@ public class BuildManager : MonoBehaviourPun
                 settlements.Add(vertex);
             }
         }
-        this.settlements = settlements;
-        
-        if (this.settlements.Count == 0)
-            CleanUp();
-
+        return settlements;
     }
+
+
 
     public void BuildWall()
     {
         Build = eBuildAction.Wall;
+        regularCities = GetCitiesWithoutWalls();
+        if (regularCities.Count == 0)
+            CleanUp();
+    }
+
+    public List<Vertex> GetCitiesWithoutWalls()
+    {
         List<Vertex> cities = new List<Vertex>();
 
         foreach (Vertex vertex in PlayerBuildings.Values)
@@ -756,14 +823,20 @@ public class BuildManager : MonoBehaviourPun
             }
         }
 
-        regularCities = cities;
-        if (regularCities.Count == 0)
-            CleanUp();
+        return cities;
     }
 
     public void BuildKnight()
     {
         Build = eBuildAction.Knight;
+        GetKnightBuildSpots();
+        if (knightsToTurnOff.Count == 0 && vertexesToTurnOff.Count == 0)
+            CleanUp();
+
+    }
+
+    public void GetKnightBuildSpots()
+    {
         HashSet<int> freeVertexesToDisplay = new HashSet<int>();
         HashSet<int> knightsVertexesToDisplay = new HashSet<int>();
 
@@ -774,7 +847,8 @@ public class BuildManager : MonoBehaviourPun
                 if (FreeVertexes.ContainsKey(vertex))
                 {
                     freeVertexesToDisplay.Add(vertex);
-                } else if (FreeKnights.ContainsKey(vertex))
+                }
+                else if (FreeKnights.ContainsKey(vertex))
                 {
                     knightsVertexesToDisplay.Add(vertex);
                 }
@@ -786,27 +860,44 @@ public class BuildManager : MonoBehaviourPun
 
         vertexesToTurnOff = freeVertexesToDisplay;
         knightsToTurnOff = knightsVertexesToDisplay;
-        if (knightsToTurnOff.Count == 0 && vertexesToTurnOff.Count == 0)
-            CleanUp();
-
     }
 
     public void UpgradeKnight()
     {
         Build = eBuildAction.UpgradeKnight;
+        
+        knightsToTurnOff = GetUpgradeableKnights();
+        if (knightsToTurnOff.Count == 0)
+            CleanUp();
+    }
+
+
+    /// <summary>
+    /// Joins all the upgradeable knights into one hashset.
+    /// </summary>
+    /// <param name="vertexID">If this was called from smith this param will indicate the ID of the first knight that was upgraded
+    /// so it wont activate him again</param>
+    /// <returns></returns>
+    public HashSet<int> GetUpgradeableKnights(int vertexID = -1)
+    {
         HashSet<int> optionalKnights = new HashSet<int>();
         foreach (KeyValuePair<int, Vertex> entry in PlayerKnights)
         {
             Knight knight = entry.Value.knight;
-            if (entry.Value.Building == eBuilding.Knight || (entry.Value.Building == eBuilding.Knight2 && CanBuildKnightsLvl3))
+            if (entry.Key == vertexID) continue;
+
+            if (entry.Value.Building == eBuilding.Knight && buildingAmounts[eBuilding.Knight2] != 0)
+            {
+                knight.InitScaleUpDown(knight.transform.localScale, Consts.ScaleKnight);
+                optionalKnights.Add(entry.Key);
+            }
+            else if ((entry.Value.Building == eBuilding.Knight2 && CanBuildKnightsLvl3 && buildingAmounts[eBuilding.Knight3]!=0))
             {
                 knight.InitScaleUpDown(knight.transform.localScale, Consts.ScaleKnight);
                 optionalKnights.Add(entry.Key);
             }
         }
-        knightsToTurnOff = optionalKnights;
-        if (knightsToTurnOff.Count == 0)
-            CleanUp();
+        return optionalKnights;
     }
 
     public void ActivateKnight()
@@ -891,8 +982,6 @@ public class BuildManager : MonoBehaviourPun
 
 
     #endregion
-
-
 
     #region Barbarians Attack And City Improvements
 
@@ -1085,18 +1174,209 @@ public class BuildManager : MonoBehaviourPun
     #endregion
 
 
-    #region RPC's
+    #region Development Cards Function
 
-    [PunRPC]
-    public void SetKnightAction(eKnightActions action)
+    // Deserter Related Functions
+    private void ScaleAllKnight()
     {
-        KnightAction = action;
+        knightsToTurnOff = new HashSet<int>(PlayerKnights.Keys);
+        foreach (Vertex vertex in PlayerKnights.Values)
+        {
+            Knight knight = vertex.knight;
+            Vector3 s1 = knight.Level > 2 ? Consts.ScaleKnight3 : Consts.ScaleKnight;
+            knight.InitScaleUpDown(knight.transform.localScale, s1);
+        }
+    }
+
+    private void BuildDesertedKnight(int lvl, bool active)
+    {
+        Deserter deserter = playerSetup.currentCard as Deserter;
+        deserter.SetKnightData(lvl, active);
+        int maxLvl = deserter.GetMaxBuildableKnight();
+        if (maxLvl == 0)
+        {
+            deserter.CleanUp();
+        }
+        else
+        {
+            GetKnightBuildSpots();
+            if (knightsToTurnOff.Count == 0 && vertexesToTurnOff.Count == 0)
+                deserter.CleanUp();
+        }
     }
 
 
+    // Diplomat Related Functions
+    public HashSet<Edge> GetInteractableRoads()
+    {
+        HashSet<Edge> interactableRoads = new HashSet<Edge>();
+        GetMyInteractableRoads(interactableRoads);
+        GetRivalsInteractableRoads(interactableRoads);
+        return interactableRoads;
+    }
+
+    private void GetMyInteractableRoads(HashSet<Edge> interactableRoads)
+    {
+        foreach (Edge edge in PlayerRoads.Values)
+        {
+            foreach (int vertexID in edge.Vertexes)
+            {
+                if (PlayerBuildings.ContainsKey(vertexID) || PlayerKnights.ContainsKey(vertexID))
+                {
+                    continue;
+                }
+                else if (RivalsBuildingVertexes.ContainsKey(vertexID) || RivalsKnights.ContainsKey(vertexID))
+                {
+                    interactableRoads.Add(edge);
+                    edge.road.InitScaleUpDown(Consts.RoadRegularScale, Consts.ScaleRoad);
+                    break;
+                }
+                else
+                {
+                    Vertex vertex;
+                    if (FreeVertexes.ContainsKey(vertexID))
+                    {
+                        vertex = FreeVertexes[vertexID];
+                    }
+                    else
+                    {
+                        vertex = FreeKnights[vertexID];
+                    }
+                    bool canAdd = true;
+                    foreach (int edgeID in vertex.Edges)
+                    {
+                        if (edgeID == edge.Id) continue;
+                        if (PlayerRoads.ContainsKey(edgeID))
+                        {
+                            canAdd = false;
+                            break;
+                        }
+                    }
+                    if (canAdd)
+                    {
+                        interactableRoads.Add(edge);
+                        edge.road.InitScaleUpDown(Consts.RoadRegularScale, Consts.ScaleRoad);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+
+    private void GetRivalsInteractableRoads(HashSet<Edge> interactableRoads)
+    {
+        foreach (Edge edge in RivalRoads.Values)
+        {
+            int owner = edge.owner;
+            foreach (int vertexID in edge.Vertexes)
+            {
+                if (PlayerBuildings.ContainsKey(vertexID) || PlayerKnights.ContainsKey(vertexID))
+                {
+                    interactableRoads.Add(edge);
+                    edge.road.InitScaleUpDown(Consts.RoadRegularScale, Consts.ScaleRoad);
+                    break;
+                }
+                else if (RivalsBuildingVertexes.ContainsKey(vertexID) || RivalsKnights.ContainsKey(vertexID))
+                {
+                    Vertex vertex;
+                    if (RivalsBuildingVertexes.ContainsKey(vertexID))
+                        vertex = RivalsBuildingVertexes[vertexID];
+                    else
+                        vertex = RivalsKnights[vertexID];
+                    
+                    if (vertex.owner == owner) continue;
+                    
+                    interactableRoads.Add(edge);
+                    edge.road.InitScaleUpDown(Consts.RoadRegularScale, Consts.ScaleRoad);
+                    break;
+                }
+                else
+                {
+                    Vertex vertex;
+                    if (FreeVertexes.ContainsKey(vertexID))
+                    {
+                        vertex = FreeVertexes[vertexID];
+                    }
+                    else
+                    {
+                        vertex = FreeKnights[vertexID];
+                    }
+                    bool canAdd = true;
+                    foreach (int edgeID in vertex.Edges)
+                    {
+                        if (edgeID == edge.Id) continue;
+                        if (RivalRoads.ContainsKey(edgeID))
+                        {
+                            if(RivalRoads[edgeID].owner == owner)
+                            {
+                                canAdd = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (canAdd)
+                    {
+                        interactableRoads.Add(edge);
+                        edge.road.InitScaleUpDown(Consts.RoadRegularScale, Consts.ScaleRoad);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+
+    private void RemoveRoad(int edgeID, int sender)
+    {
+
+        if (!photonView.IsMine) return;
+        Edge edgeToRemove;
+
+        if (PhotonNetwork.LocalPlayer.ActorNumber == sender)
+        {
+            edgeToRemove = RemoveIfExist(PlayerRoads, edgeID);
+            FreeEdges.Add(edgeID, edgeToRemove);
+            if(PhotonNetwork.LocalPlayer.ActorNumber == GameManager.instance.CurrentPlayer)
+            {
+                CalcLongestRoad();
+                edgesToTurnOff = CalcRoads();
+            }
+            else
+            {
+                Utils.RaiseEventForPlayer(RaiseEventsCode.FinishDiplomat, GameManager.instance.CurrentPlayer);    
+            }
+        }
+        else
+        {
+            edgeToRemove = RemoveIfExist(RivalRoads, edgeID);
+            FreeEdges.Add(edgeID, edgeToRemove);
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishDiplomat, GameManager.instance.CurrentPlayer);
+        }
+
+
+    }
+    public void SwitchProbs(int tileID1, int tileID2)
+    {
+        Tile tile1 = PhotonView.Find(tileID1).GetComponent<Tile>();
+        Tile tile2 = PhotonView.Find(tileID2).GetComponent<Tile>();
+
+        string tile1Numebr = tile1.probability.tNumber.text;
+        string tile2Numebr = tile2.probability.tNumber.text;
+
+        probNumberTile[tile1Numebr].Remove(tile1);
+        probNumberTile[tile1Numebr].Add(tile2);
+
+        probNumberTile[tile2Numebr].Remove(tile2);
+        probNumberTile[tile2Numebr].Add(tile1);
+
+
+        tile1.probability.photonView.RPC("SetProb", RpcTarget.AllBufferedViaServer, tile2Numebr);
+        tile2.probability.photonView.RPC("SetProb", RpcTarget.AllBufferedViaServer, tile1Numebr);
+
+    }
 
     #endregion
-
 
 
     #region Private Functions

@@ -1,18 +1,27 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using Photon.Pun;
 using UnityEngine;
 
 public class Road : GamePiece
 {
-    // Start is called before the first frame update
-    void Start()
+
+    public Edge edge;
+
+    void OnMouseDown()
     {
-        
+        Diplomat diplomat = edge.playerSetup.currentCard as Diplomat;
+        diplomat.interactableRoad.Remove(edge);
+        StopScaling();
+        if (edge.owner != PhotonNetwork.LocalPlayer.ActorNumber)
+        {
+            Utils.RaiseEventForPlayer(RaiseEventsCode.LoseRoad, edge.owner, new object[] { edge.Id });
+        }
+        else
+        {
+            edge.DestroyRoad();
+        }
+        diplomat.StopScalingRoads();
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        Drop();
-    }
 }

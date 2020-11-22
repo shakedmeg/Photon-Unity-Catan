@@ -10,7 +10,6 @@ public class Knight : VertexGamePiece
     private Color playerColor;
 
     private MeshRenderer headMeshRenderer;
-    private BoxCollider bColl;
 
     private BuildManager buildManager;
     private TurnManager turnManager;
@@ -18,7 +17,7 @@ public class Knight : VertexGamePiece
 
     public bool Activated { get; set; }
 
-    public int Level { get; private set; }
+    public int Level { get; set; }
 
     public bool Useable { get; set; }
 
@@ -26,8 +25,7 @@ public class Knight : VertexGamePiece
     {
         base.Awake();
         headMeshRenderer = head.GetComponent<MeshRenderer>();
-        bColl = GetComponent<BoxCollider>();
-        bColl.enabled = false;
+        coll.enabled = false;
         buildManager = GameManager.instance.playerGameObject.GetComponent<BuildManager>();
         turnManager = GameManager.instance.playerGameObject.GetComponent<TurnManager>();
         cardManager = GameManager.instance.playerGameObject.GetComponent<CardManager>();
@@ -39,20 +37,47 @@ public class Knight : VertexGamePiece
         if (data.Length > 1)
         {
             Activated = (bool) data[1];
-            Useable = (bool)data[3];
+            Useable = (bool)data[2];
+            if(Useable)
+                coll.enabled = true;
+
             if (Activated)
             {
-                bColl.enabled = true;
                 ChangeHeadColor(true);
                 if (photonView.IsMine)
+                {
                     turnManager.barbarians.photonView.RPC("ActivateKnight", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, 1);
+                }
             }
-            Level = (int)data[2];
         }
     }
 
     void OnMouseDown()
     {
+        if (Vertex.playerSetup.currentCard != null)
+        {
+            switch (Vertex.playerSetup.currentCard.type)
+            {
+                case eDevelopmentCardsTypes.Smith:
+                    HandleSmith();
+                    break;
+                case eDevelopmentCardsTypes.Intrigue:
+                    HandleIntrigue();
+                    break;
+            }
+            return;
+        }
+
+        if(Vertex.playerSetup.currentCardType == eDevelopmentCardsTypes.Deserter)
+        {
+            Utils.RaiseEventForAll(RaiseEventsCode.RemoveKnight, new object[] { Vertex.ID });
+            buildManager.StopScalingKnights();
+            Vertex.playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+            Utils.RaiseEventForPlayer(RaiseEventsCode.BuildDesertedKnight, GameManager.instance.CurrentPlayer, new object[] { Level, Activated });
+            Vertex.DestroyKnight();
+            return;
+        }
+
         if (buildManager.Build == eBuildAction.UpgradeKnight)
         {
             Vertex.UpgradeKnight();
@@ -64,11 +89,9 @@ public class Knight : VertexGamePiece
             if (buildManager.Build == eBuildAction.ActivateKnight && Activated) return;
             if (buildManager.Build == eBuildAction.ActivateKnight)
             {
-                Activated = true;
-                this.photonView.RPC("ChangeHeadColor", RpcTarget.AllBufferedViaServer, true);
-                cardManager.Pay();
+                cardManager.Pay(Consts.Prices[buildManager.Build]);
+                TurnOnKnight();
                 buildManager.CleanUp();
-                turnManager.barbarians.photonView.RPC("ActivateKnight", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, Level);
             }
             else
             {
@@ -113,6 +136,7 @@ public class Knight : VertexGamePiece
 
 
                         data = new object[] { Vertex.ID };
+                        Vertex.playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
                         Utils.RaiseEventForPlayer(RaiseEventsCode.DisplaceKnight, this.photonView.Owner.ActorNumber, data);
                         break;
 
@@ -125,13 +149,27 @@ public class Knight : VertexGamePiece
 
     public void SetCollider(bool flag)
     {
-        bColl.enabled = flag;
+        coll.enabled = flag;
     }
 
     [PunRPC]
     public void ChangeHeadColor(bool flag)
     {
         headMeshRenderer.material.color = flag? Consts.KnightHeadActivated : playerColor;
+    }
+
+    [PunRPC]
+    public void SetLevel(int lvl)
+    {
+        Level = lvl;
+    }
+
+    public void TurnOnKnight()
+    {
+        Activated = true;
+        this.photonView.RPC("ChangeHeadColor", RpcTarget.AllBufferedViaServer, true);
+        turnManager.barbarians.photonView.RPC("ActivateKnight", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, Level);
+        Vertex.playerSetup.playerPanel.photonView.RPC("SetActivatedKnightsText", RpcTarget.AllBufferedViaServer, Level);
     }
 
     public void TurnOffKnight()
@@ -141,6 +179,8 @@ public class Knight : VertexGamePiece
         SetCollider(false);
         this.photonView.RPC("ChangeHeadColor", RpcTarget.AllBufferedViaServer, false);
         turnManager.barbarians.photonView.RPC("DeactivateKnight", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, Level);
+        Vertex.playerSetup.playerPanel.photonView.RPC("SetActivatedKnightsText", RpcTarget.AllBufferedViaServer, Level*(-1));
+
     }
 
     public override void StopScaling()
@@ -148,4 +188,32 @@ public class Knight : VertexGamePiece
         base.StopScaling();
         transform.localScale = Level == 3 ? Consts.Knight3RegularScale : Consts.KnightRegularScale;
     }
+
+
+
+    #region Development Cards Functions
+    private void HandleSmith()
+    {
+        Smith smith = Vertex.playerSetup.currentCard as Smith;
+        Vertex.BuildUpgradedKnight();
+        if (!smith.BuiltOne)
+        {
+            smith.BuiltOne = true;
+            smith.BuildSecondKnight(Vertex);
+        }
+        else
+        {
+            smith.CleanUp();
+        }
+    }
+
+    private void HandleIntrigue()
+    {
+        Intrigue intrigue = Vertex.playerSetup.currentCard as Intrigue;
+        intrigue.StopScalingKnights();
+        object [] data = new object[] { Vertex.ID };
+        Vertex.playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+        Utils.RaiseEventForPlayer(RaiseEventsCode.DisplaceKnight, this.photonView.Owner.ActorNumber, data);
+    }
+    #endregion
 }

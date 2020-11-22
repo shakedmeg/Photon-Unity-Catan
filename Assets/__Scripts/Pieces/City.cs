@@ -93,33 +93,15 @@ public class City : VertexGamePiece
                 break;
 
             case eBuildAction.Wall:
-                Vertex.buildManager.StopScalingBuildings(Vertex.buildManager.regularCities, eBuilding.City);
-                HasWall = true;
-                p1 = Vertex.transform.position + new Vector3(Consts.DropWall, 0.25f, 0);
-                p0 = Vertex.transform.position + new Vector3(0, 0.25f, 0);
-                Vector3 cityP1 = transform.position;
-                cityP1 += new Vector3(0, Consts.RaiseHighetCity, 0);
-                InitDrop(transform.position, cityP1);
-
-                if (Improved)
-                {
-                    Vector3 improvedP1 = cityImprovement.transform.position;
-                    improvedP1 += new Vector3(0, Consts.RaiseHighetCity, 0);
-                    cityImprovement.InitDrop(cityImprovement.transform.position, improvedP1);
-                }
-
-
-                
-                wall = PhotonNetwork.Instantiate(wallPrefab.name, p1, Quaternion.identity, 0, new object[] { Vertex.buildManager.playerColor }).GetComponent<Wall>();
-                wall.InitDrop(p1, p0);
-                wall.Vertex = Vertex;
-                Vertex.buildManager.buildingAmounts[eBuilding.Wall] -= 1;
-                Vertex.playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)eBuilding.Wall - 1, Vertex.buildManager.buildingAmounts[eBuilding.Wall].ToString());
-
-
+                BuildWall(p0, p1);
                 Vertex.AfterBuild();
-                Vertex.cardManager.allowedCards += 2;
                 break;
+        }
+
+        if(Vertex.playerSetup.currentCard != null)
+        {
+            BuildWall(p0, p1);
+            Vertex.playerSetup.currentCard.CleanUp();
         }
     }
 
@@ -137,5 +119,36 @@ public class City : VertexGamePiece
         Vertex.buildManager.Build = eBuildAction.None;
         Vertex.buildManager.ImproveCommodity = eCommodity.None;
         Vertex.buildManager.StopScalingBuildings(Vertex.buildManager.regularCities, eBuilding.City);
+        Vertex.turnManager.SetControl(true);
     }
+
+    public void BuildWall(Vector3 p0, Vector3 p1)
+    {
+        Vertex.buildManager.StopScalingBuildings(Vertex.buildManager.regularCities, eBuilding.City);
+        HasWall = true;
+        p1 = Vertex.transform.position + new Vector3(Consts.DropWall, 0.25f, 0);
+        p0 = Vertex.transform.position + new Vector3(0, 0.25f, 0);
+        Vector3 cityP1 = transform.position;
+        cityP1 += new Vector3(0, Consts.RaiseHighetCity, 0);
+        InitDrop(transform.position, cityP1);
+
+        if (Improved)
+        {
+            Vector3 improvedP1 = cityImprovement.transform.position;
+            improvedP1 += new Vector3(0, Consts.RaiseHighetCity, 0);
+            cityImprovement.InitDrop(cityImprovement.transform.position, improvedP1);
+        }
+
+
+
+        wall = PhotonNetwork.Instantiate(wallPrefab.name, p1, Quaternion.identity, 0, new object[] { Vertex.buildManager.playerColor }).GetComponent<Wall>();
+        wall.InitDrop(p1, p0);
+        wall.Vertex = Vertex;
+        Vertex.buildManager.buildingAmounts[eBuilding.Wall] -= 1;
+        Vertex.playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)eBuilding.Wall - 1, Vertex.buildManager.buildingAmounts[eBuilding.Wall].ToString());
+
+
+        Vertex.cardManager.allowedCards += 2;
+    }
+
 }

@@ -220,6 +220,8 @@ MonoBehaviour:
     type: 3}
   robberPrefab: {fileID: 1457270171187698123, guid: e5d5f0bfeb227a54da9287b33b1a2235,
     type: 3}
+  merchantPrefab: {fileID: 2034313315154614947, guid: dda095b56503c344981d36affc42537e,
+    type: 3}
   ports:
   - {fileID: 720708600611332988, guid: 8e96cf9e7e755ab418a838c8dca49285, type: 3}
   - {fileID: 5289944394066282071, guid: e89a165bc748293439b5e2096e4c3b3d, type: 3}

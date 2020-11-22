@@ -205,4 +205,23 @@ public class Utils
         return card is ResourceCard;
     }
 
+
+
+    public static void PaintPlayerIcon(GameObject playerIconGO, int player)
+    {
+        foreach (Player playerObject in GameManager.instance.players)
+        {
+            if (playerObject.ActorNumber == player)
+            {
+                object color;
+                playerObject.CustomProperties.TryGetValue(Consts.PLAYER_COLOR, out color); ;
+                string playerColor = (string)color;
+                PlayerIcon playerIcon = playerIconGO.GetComponent<PlayerIcon>();
+                playerIcon.SetColor(Name_To_Color(playerColor));
+                playerIcon.Owner = player;
+                break;
+            }
+        }
+    }
+
 }

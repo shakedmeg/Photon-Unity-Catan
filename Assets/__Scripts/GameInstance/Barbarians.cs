@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Photon.Pun;
 using Photon.Realtime;
+using ExitGames.Client.Photon;
 using System.Linq;
 
 public class Barbarians : MonoBehaviourPun
@@ -28,11 +29,37 @@ public class Barbarians : MonoBehaviourPun
 
     private const string RollsTillAttackFormat = "Rolls Till Attack: {0}";
 
+
+    List<int> winners;
+    private int startHandoutFrom;
+
     void Awake()
     {
         gameObject.SetActive(false);
     }
 
+
+
+
+    private void OnEnable()
+    {
+        PhotonNetwork.NetworkingClient.EventReceived += OnEvent;
+    }
+
+    private void OnDisable()
+    {
+        PhotonNetwork.NetworkingClient.EventReceived -= OnEvent;
+    }
+
+    void OnEvent(EventData photonEvent)
+    {
+        switch (photonEvent.Code)
+        {
+            case (byte)RaiseEventsCode.FinishDevelopmentCardWinHandout:
+                ActivateWinPanelTo(winners);
+                break;
+        }
+    }
 
 
     void Attack()
@@ -41,6 +68,7 @@ public class Barbarians : MonoBehaviourPun
         foreach (int str in knightsPower.Values)
             playersStrength += str;
 
+        Utils.RaiseEventForPlayer(RaiseEventsCode.SetPlayerPanel, GameManager.instance.CurrentPlayer, new object[] { false });
         if (playersStrength < strength)
             AttackLost();
         else
@@ -59,7 +87,6 @@ public class Barbarians : MonoBehaviourPun
     #region Defeat
     void AttackLost()
     {
-        Utils.RaiseEventForPlayer(RaiseEventsCode.SetPlayerPanel, GameManager.instance.CurrentPlayer, new object[] { false });
         mightNeedToLoseCity = new List<KeyValuePair<int, int>>(knightsPower.ToList());
         mightNeedToLoseCity.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
         needToLoseCurrent = 0;
@@ -101,7 +128,7 @@ public class Barbarians : MonoBehaviourPun
         biggestDefenders = new List<KeyValuePair<int, int>>(knightsPower.ToList());
         biggestDefenders.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
         biggestDefenders.Reverse();
-        List<int> winners = new List<int>();
+        winners = new List<int>();
         int max = 0;
         foreach (KeyValuePair<int,int> playerEntry in biggestDefenders)
         {
@@ -113,14 +140,59 @@ public class Barbarians : MonoBehaviourPun
             else
                 break;
         }
-        if (winners.Count == 1)
-            Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, winners[0], new object[] { 1 });
+        if (winners.Count == 1) 
+        {
+            Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, winners[0], new object[] { 1, true });
+            FinishAttack();
+        }
         else
-            Debug.Log("handing out development cards");
-            //Utils.RaiseEventForGroup(RaiseEventsCode.DevelopmentCard, winners.ToArray());
-        FinishAttack();
+        {
+            startHandoutFrom = GameManager.instance.CurrentPlayer;
+            ActivateWinPanelTo(winners);
+            
+        }
     }
 
+
+    private void ActivateWinPanelTo(List<int> winners)
+    {
+        if(winners.Count == 0)
+        {
+            FinishAttack();
+            return;
+        }
+
+        if (winners.Contains(startHandoutFrom))
+        {
+            winners.Remove(startHandoutFrom);
+            Utils.RaiseEventForPlayer(RaiseEventsCode.ChooseDevelopmentCard, startHandoutFrom);
+        }
+        else
+        {
+            bool startLooking = false;
+            for(int i = 0; i < GameManager.instance.players.Length * 2; i++)
+            {
+                int curr = GameManager.instance.players[i % GameManager.instance.players.Length].ActorNumber;
+                if (!startLooking)
+                {
+                    if(curr == startHandoutFrom)
+                    {
+                        startLooking = true;
+                    }
+                }
+                else
+                {
+                    if (winners.Contains(curr))
+                    {
+                        startHandoutFrom = curr;
+                        winners.Remove(startHandoutFrom);
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.ChooseDevelopmentCard, startHandoutFrom);
+                        break;
+                    }
+                }
+            }
+        }
+    }
     #endregion
 
 

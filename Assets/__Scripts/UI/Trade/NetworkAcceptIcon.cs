@@ -21,6 +21,7 @@ public class NetworkAcceptIcon : MonoBehaviourPun
 
     void OnMouseDown()
     {
+        cColl.enabled = false;
         Utils.RaiseEventForPlayer(RaiseEventsCode.CompleteTrade, playerID, new object[] { offerPanel.requestedCards, offerPanel.offeredCards });
         cardManager.CompleteTrade(offerPanel.offeredCards, offerPanel.requestedCards);
         cardManager.CloseTrade();

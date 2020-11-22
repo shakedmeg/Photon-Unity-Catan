@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
-using Photon.Realtime;
 using ExitGames.Client.Photon;
 using System.Linq;
 using UnityEngine.UI;
@@ -15,6 +14,7 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     public eCardsState state;
     public Robber robber;
+    public MerchantPiece merchant;
 
     #region Panels
     public GameObject buttonsPanel;
@@ -64,7 +64,7 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     #region City Improvement Fields
 
-    private Dictionary<eCommodity, int> commodityPrices = new Dictionary<eCommodity, int>()
+    public Dictionary<eCommodity, int> commodityPrices = new Dictionary<eCommodity, int>()
     {
         { eCommodity.Paper, 1 },
         { eCommodity.Coin, 1 },
@@ -90,7 +90,7 @@ public class CardManager : MonoBehaviourPunCallbacks
         { eResources.Wheat, 0 }
     };
 
-    private Dictionary<eCommodity, int> commodityCount = new Dictionary<eCommodity, int>()
+    public Dictionary<eCommodity, int> commodityCount = new Dictionary<eCommodity, int>()
     {
         { eCommodity.Paper, 0},
         { eCommodity.Coin, 0},
@@ -102,7 +102,7 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     #region Port Fields
 
-    private Dictionary<eResources, ePorts> ports = new Dictionary<eResources, ePorts>()
+    public Dictionary<eResources, ePorts> ports = new Dictionary<eResources, ePorts>()
     {
         { eResources.Brick, ePorts.p4To1},
         { eResources.Wood, ePorts.p4To1 },
@@ -150,6 +150,49 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     #endregion
 
+    #region Development Cards Fields
+
+    public List<GameObject> developmentCardsPrefabs;
+
+    public GameObject constitution;
+
+    public GameObject printer;
+
+    public List<GameObject> backgrounds;
+
+    public CanvasGroup developmentCardsPanel;
+
+    public GameObject developmentCardsContentPanel;
+
+    public GameObject chooseDevelopmentCardPanel;
+
+    private bool winDevFromAtt = false;
+    public bool ThrowDevCards { get; set; } = false;
+
+    public List<DevelopmentCard> developmentHand = new List<DevelopmentCard>();
+
+    public GameObject givePanel;
+
+    public GameObject giveCardsContent;
+
+    public GameObject exchangePanel;
+
+    public GameObject exchangeCardsContent;
+
+    public List<Card> forcedCardsToGive;
+
+    public Card exchangeCard;
+
+    public List<Card> cardsToTake;
+    public GameObject takeCardsContent;
+
+    public int merchantPort = -1;
+
+    public List<eResources> merchantFleetPorts = new List<eResources>();
+
+    public Dictionary<Alchemist, CanvasGroup> alchemists = new Dictionary<Alchemist, CanvasGroup>();
+
+    #endregion
 
     void Awake()
     {
@@ -177,15 +220,17 @@ public class CardManager : MonoBehaviourPunCallbacks
     void OnEvent(EventData photonEvent)
     {
         object[] data;
+        int numOfCards;
         switch (photonEvent.Code)
         {
             case (byte)RaiseEventsCode.SendMapData:
                 data = (object[])photonEvent.CustomData;
                 InitRobber((int)data[4]);
+                InitMerchant((int)data[6]);
                 break;
             case (byte)RaiseEventsCode.SevenRolled:
                 if (!photonView.IsMine) return;
-                int numOfCards = resourcesHand.Count + commodityHand.Count;
+                numOfCards = resourcesHand.Count + commodityHand.Count;
                 if (numOfCards > allowedCards)
                 {
                     state = eCardsState.Throw;
@@ -225,8 +270,15 @@ public class CardManager : MonoBehaviourPunCallbacks
                 {
                     InitCard(cardName);
                 }
-                playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
-                EndRobberPlacement();
+                SetNumOfCardsInPanel();
+                if (playerSetup.currentCard == null)
+                    EndRobberPlacement();
+                else 
+                {
+                    Bishop bishop = playerSetup.currentCard as Bishop;
+                    bishop.SetPlayerRes(photonEvent.Sender);
+                    bishop.CleanUp();
+                }
                 break;
             case (byte)RaiseEventsCode.CompleteTrade:
                 if (!photonView.IsMine) return;
@@ -242,12 +294,116 @@ public class CardManager : MonoBehaviourPunCallbacks
                 playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.Good);
                 pickCardPanel.SetActive(true);
                 break;
+            case (byte)RaiseEventsCode.Sabotage:
+                if (!photonView.IsMine) return;
+                HandleSaboteur();
+                break;
+            case (byte)RaiseEventsCode.CountDevCards:
+                if (!photonView.IsMine) return;
+                Utils.RaiseEventForPlayer(RaiseEventsCode.DevCardsCount, GameManager.instance.CurrentPlayer, new object[] { developmentHand.Select(x => new int[] { (int)x.type, x.Background.GetPhotonView().ViewID }).ToArray() });
+                break;
+            case (byte)RaiseEventsCode.Spy:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+                for (int i = 0; i<developmentHand.Count; i++)
+                {
+                    if((int)developmentHand[i].type == (int)data[0])
+                    {
+                        Destroy(developmentHand[i].gameObject);
+                        developmentHand.RemoveAt(i);
+                        break;
+                    }
+                }
+                break;
+            case (byte)RaiseEventsCode.Wedding:
+                if (!photonView.IsMine) return;
+                HandleWedding();
+                break;
+            case (byte)RaiseEventsCode.CountCommodities:
+                if (!photonView.IsMine) return;
+                Utils.RaiseEventForPlayer(RaiseEventsCode.CommoditiesCount, photonEvent.Sender, new object[] { commodityHand.Count });
+                break;
+            case (byte)RaiseEventsCode.CommercialHarbor:
+                if (!photonView.IsMine) return;
+                HandleCommercialHarbor();
+                break;
+            case (byte)RaiseEventsCode.CompleteCommercialHarborExchange:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                InitCard((int)data[0]);
+                RemoveCommodityCardFromHand((CommodityCard)exchangeCard);
+                exchangeCard = null;
+                break;
+            case (byte)RaiseEventsCode.CountCards:
+                if (!photonView.IsMine) return;
+                Utils.RaiseEventForPlayer(RaiseEventsCode.CardsCount, photonEvent.Sender, new object[] { resourcesHand.Count + commodityHand.Count });
+                break;
+            case (byte)RaiseEventsCode.MasterMerchant:
+                if (!photonView.IsMine) return;
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.MasterMerchantVictim);
+                List<int> cards = new List<int>();
+                foreach (ResourceCard resourceCard in resourcesHand)
+                    cards.Add((int)resourceCard.resource);
+                foreach (CommodityCard commodityCard in commodityHand )
+                    cards.Add((int)commodityCard.commodity);
+                Utils.RaiseEventForPlayer(RaiseEventsCode.FinishMasterMerchant, photonEvent.Sender, new object[] { cards.ToArray() });
+                break;
+            case (byte)RaiseEventsCode.CompleteMasterMerchant:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                foreach (int i in (int[])data[0])
+                    RemoveCardFromHandByType(i);
+                SetNumOfCardsInPanel();
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+                break;
+            case (byte)RaiseEventsCode.LoseMerchant:
+                if (!photonView.IsMine) return;
+                RemoveMerchant();
+                playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, -1);
+                break;
+            case (byte)RaiseEventsCode.ResourceMonopoly:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                HandleResourceMonopoly((int)data[0]);
+                break;
+            case (byte)RaiseEventsCode.TradeMonopoly:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                HandleTradeMonopoly((int)data[0]);
+                break;
+            case (byte)RaiseEventsCode.DeserveDevelopmentCard:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                CheckDevelopmentCardEntitledment((int)data[0], (int)data[1]);
+                break;
+            case (byte)RaiseEventsCode.SendDevelopmentCardFromRoll:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                AddDevelopmentCard((int)data[0], RaiseEventsCode.FinishDevelopmentCardRollHandout);                
+                break;
+            case (byte)RaiseEventsCode.ChooseDevelopmentCard:
+                if (!photonView.IsMine) return;
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.ChooseDevCard);
+                chooseDevelopmentCardPanel.SetActive(true);
+                break;
+            case (byte)RaiseEventsCode.SendDevelopmentCardFromWin:
+                if (!photonView.IsMine) return;
+                data = (object[])photonEvent.CustomData;
+                winDevFromAtt = true;
+                AddDevelopmentCard((int)data[0], RaiseEventsCode.FinishDevelopmentCardWinHandout);                
+                break;
         }
     }
 
     private void InitRobber(int viewID)
     {
         robber = PhotonView.Find(viewID).gameObject.GetComponent<Robber>();
+    }
+
+    private void InitMerchant(int viewID)
+    {
+        merchant = PhotonView.Find(viewID).gameObject.GetComponent<MerchantPiece>();
     }
 
     public void InitCards(List<int> resources)
@@ -311,10 +467,21 @@ public class CardManager : MonoBehaviourPunCallbacks
     {
         eCommodity commodity = (eCommodity)commodityNum;
         if (buildManager.cityCount == 0 || commodityCount[commodity] < commodityPrices[commodity] || commodityPrices[commodity] == 6) return;
-        
+
         int unimprovedCitiesCount = buildManager.CountUnimprovedCities();
         bool canImproveCity = commodityPrices[commodity] >= 4 && unimprovedCitiesCount != 0;
-        
+        if (!canImproveCity)
+        {
+            if(GameManager.instance.cityImprovementHolder[commodity][0] == PhotonNetwork.LocalPlayer.ActorNumber)
+            {
+                canImproveCity = true;
+            }
+            else
+            {
+                if (GameManager.instance.cityImprovementHolder[commodity][0] != -1)
+                    canImproveCity = GameManager.instance.cityImprovementHolder[commodity][1] >= commodityPrices[commodity];
+            }
+        }        
         if (canImproveCity|| commodityPrices[commodity] < 4)
         {
             for(int i=0; i< commodityPrices[commodity]; i++)
@@ -322,6 +489,7 @@ public class CardManager : MonoBehaviourPunCallbacks
 
             string level = commodityPrices[commodity].ToString();
             improveButtons[commodityNum - 5].text = string.Format("Level: {0}", level);
+            playerSetup.commodityButtonsText[commodityNum - 5].text = string.Format("Level: {0}", level);
             playerSetup.playerPanel.photonView.RPC("SetCommodityText", RpcTarget.AllBufferedViaServer, commodityNum - 5, level);
             
             commodityPrices[commodity] += 1;
@@ -331,18 +499,19 @@ public class CardManager : MonoBehaviourPunCallbacks
                     OpenPerk(commodity);
                     break;
                 case 5:
-                    Utils.RaiseEventForMaster(RaiseEventsCode.CheckImporveCity, new object[] { commodityNum, 4 });
+                    turnManager.SetControl(false);
+                    Utils.RaiseEventForAll(RaiseEventsCode.CheckImporveCity, new object[] { commodityNum, 4 });
                     break;
                 case 6:
-                    Utils.RaiseEventForMaster(RaiseEventsCode.CheckImporveCity, new object[] { commodityNum, 5 });
+                    turnManager.SetControl(false);
+                    Utils.RaiseEventForAll(RaiseEventsCode.CheckImporveCity, new object[] { commodityNum, 5 });
                     break;
             }
         }
-
     }
 
 
-    void OpenPerk(eCommodity commodity)
+    public void OpenPerk(eCommodity commodity)
     {
         switch (commodity)
         {
@@ -369,9 +538,9 @@ public class CardManager : MonoBehaviourPunCallbacks
         return true;
     }
 
-    public void Pay()
+    public void Pay(Dictionary<eResources, int> price)
     {
-        foreach (KeyValuePair<eResources, int> entry in Consts.Prices[buildManager.Build])
+        foreach (KeyValuePair<eResources, int> entry in price)
         {
             resourceCount[entry.Key] -= entry.Value;
             for (int i = 0; i < entry.Value; i++)
@@ -381,11 +550,10 @@ public class CardManager : MonoBehaviourPunCallbacks
                 Destroy(card.gameObject);
             }
         }
-        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+        SetNumOfCardsInPanel();
     }
 
     #endregion
-
 
     #region Port Text Related
 
@@ -438,7 +606,6 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     #endregion
 
-
     #region Throw Related
     public void Thorw()
     {
@@ -466,8 +633,11 @@ public class CardManager : MonoBehaviourPunCallbacks
         throwCardsPanel.SetActive(false);
         SetMainPanelActive(false);
         playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
-        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
-        Utils.RaiseEventForMaster(RaiseEventsCode.FinishedThrowing);
+        SetNumOfCardsInPanel();
+        if(playerSetup.currentCardType == eDevelopmentCardsTypes.Saboteur)
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishSabotuer, GameManager.instance.CurrentPlayer);
+        else
+            Utils.RaiseEventForMaster(RaiseEventsCode.FinishedThrowing);
 
     }
 
@@ -486,7 +656,7 @@ public class CardManager : MonoBehaviourPunCallbacks
             else
                 InitCard(resource);
         }
-        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+        SetNumOfCardsInPanel();
     }
 
     public void AddCardsToCache(Tile tile, int vertexID)
@@ -500,7 +670,7 @@ public class CardManager : MonoBehaviourPunCallbacks
             else
                 cachedRollCards.Add(resource);
         }
-        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+        SetNumOfCardsInPanel();
     }
 
     public void AddCardToHand(Card card)
@@ -597,7 +767,7 @@ public class CardManager : MonoBehaviourPunCallbacks
     {
         pickCardPanel.SetActive(false);
         InitCard(resource);
-        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+        SetNumOfCardsInPanel();
         playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
         Utils.RaiseEventForMaster(RaiseEventsCode.FinishPickCard);
     }
@@ -622,12 +792,16 @@ public class CardManager : MonoBehaviourPunCallbacks
         mainPanel.blocksRaycasts = flag;
     }
 
+    public void SetNumOfCardsInPanel()
+    {
+        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+    }
+
     #endregion
 
     #region Robber Functions
     public void StartRob()
     {
-        state = eCardsState.Robber;
         robber.gameObject.SetActive(false);
         if (robber.photonView.Owner != PhotonNetwork.LocalPlayer)
             robber.photonView.TransferOwnership(PhotonNetwork.LocalPlayer.ActorNumber);
@@ -643,7 +817,26 @@ public class CardManager : MonoBehaviourPunCallbacks
     }
 
 
+
     public void SelectRob(List<int> vertexes)
+    {
+        HashSet<int> possiblePlayersToRob = GetRobbablePlayers(vertexes);
+        if (possiblePlayersToRob.Count != 0)
+        {
+            selectPlayerPanel.SetActive(true);
+            foreach (int player in possiblePlayersToRob)
+            {
+                GameObject playerIconGO = Instantiate(playerIconPrefab, selectPlayerPanel.transform);
+                Utils.PaintPlayerIcon(playerIconGO, player);
+            }
+        }
+        else
+        {
+            EndRobberPlacement();
+        }
+    }
+
+    public HashSet<int> GetRobbablePlayers(IEnumerable<int> vertexes)
     {
         HashSet<int> possiblePlayersToRob = new HashSet<int>();
         foreach (int vertex in vertexes)
@@ -653,32 +846,9 @@ public class CardManager : MonoBehaviourPunCallbacks
                 possiblePlayersToRob.Add(buildManager.RivalsBuildingVertexes[vertex].owner);
             }
         }
-        if (possiblePlayersToRob.Count != 0)
-        {
-            selectPlayerPanel.SetActive(true);
-            foreach (int player in possiblePlayersToRob)
-            {
-                GameObject playerIconGO = Instantiate(playerIconPrefab, selectPlayerPanel.transform);
-                foreach (Player playerObject in GameManager.instance.players)
-                {
-                    if (playerObject.ActorNumber == player)
-                    {
-                        object color;
-                        playerObject.CustomProperties.TryGetValue(Consts.PLAYER_COLOR, out color); ;
-                        string playerColor = (string)color;
-                        PlayerIcon playerIcon = playerIconGO.GetComponent<PlayerIcon>();
-                        playerIcon.SetColor(Utils.Name_To_Color(playerColor));
-                        playerIcon.Owner = player;
-                        break;
-                    }
-                }
-            }
-        }
-        else
-        {
-            EndRobberPlacement();
-        }
+        return possiblePlayersToRob;
     }
+
 
     public void FinishSelect()
     {
@@ -700,7 +870,7 @@ public class CardManager : MonoBehaviourPunCallbacks
             ResourceCard resourceCard = resourcesHand[chosen];
             int resource = (int)resourceCard.resource;
             RemoveResourceCardFromHand(resourceCard);
-            playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+            SetNumOfCardsInPanel();
             return resource;
         }
         else
@@ -709,7 +879,7 @@ public class CardManager : MonoBehaviourPunCallbacks
             CommodityCard commodityCard = commodityHand[chosen];
             int commodity = (int)commodityCard.commodity;
             RemoveCommodityCardFromHand(commodityCard);
-            playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+            SetNumOfCardsInPanel();
             return commodity;
         }
     }
@@ -717,10 +887,7 @@ public class CardManager : MonoBehaviourPunCallbacks
 
     public void EndRobberPlacement()
     {
-
-        //robber.photonView.TransferOwnership(0);
         turnManager.GainControl(); // change this once robber placement is good
-        state = eCardsState.None;
         buildManager.KnightAction = eKnightActions.None;
     }
 
@@ -797,12 +964,24 @@ public class CardManager : MonoBehaviourPunCallbacks
         int numOfEntitledCards = 0;
         foreach(KeyValuePair<eResources, int> entry in currentTradeResources)
         {
-            if (entry.Value % (int)ports[entry.Key] != 0)
+            if (merchantPort == (int)entry.Key || merchantFleetPorts.Contains(entry.Key))
             {
-                CheckMakeOfferButton();
-                return;
+                if(entry.Value % 2 != 0)
+                {
+                    CheckMakeOfferButton();
+                    return;
+                }
+                numOfEntitledCards += entry.Value / 2;
             }
-            numOfEntitledCards += entry.Value / (int)ports[entry.Key];
+            else
+            {
+                if (entry.Value % (int)ports[entry.Key] != 0)
+                {
+                    CheckMakeOfferButton();
+                    return;
+                }
+                numOfEntitledCards += entry.Value / (int)ports[entry.Key];
+            }
         }
 
         foreach(int value in currentTradeCommodities.Values)
@@ -860,7 +1039,8 @@ public class CardManager : MonoBehaviourPunCallbacks
 
         ClearCurrentTrade();
         ClearOffers();
-        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+        SetNumOfCardsInPanel();
+
     }
 
 
@@ -921,7 +1101,7 @@ public class CardManager : MonoBehaviourPunCallbacks
         }
 
         InitCards(new List<int>(cardsToAdd));
-        playerSetup.playerPanel.photonView.RPC("SetNumOfCardsText", RpcTarget.AllBufferedViaServer, (resourcesHand.Count + commodityHand.Count).ToString());
+        SetNumOfCardsInPanel();
     }
 
 
@@ -940,6 +1120,394 @@ public class CardManager : MonoBehaviourPunCallbacks
 
 
 
+
+    #endregion
+
+    #region Development Cards Hand
+
+    public void SetDevelopmentCardsPanelActive(bool flag)
+    {
+        developmentCardsPanel.interactable = flag;
+        //developmentCardsPanel.blocksRaycasts = flag;
+    }
+
+    private void CheckDevelopmentCardEntitledment(int eventDice, int redDice)
+    {
+        eCommodity cardType = eCommodity.None;
+        switch (eventDice)
+        {
+            case 3:
+                cardType = eCommodity.Paper;
+                break;
+            case 4:
+                cardType = eCommodity.Silk;
+                break;
+            case 5:
+                cardType = eCommodity.Coin;
+                break;
+        }
+        int commodityLevel;
+        if (commodityPrices[cardType] == 1)
+            commodityLevel = 0;
+        else
+            commodityLevel = commodityPrices[cardType];
+
+        if (commodityLevel >= redDice)
+            Utils.RaiseEventForMaster(RaiseEventsCode.GiveDevelopmentCard, new object[] { true, (int)cardType });
+        else
+            Utils.RaiseEventForMaster(RaiseEventsCode.GiveDevelopmentCard, new object[] { false });
+    }
+
+    public void ChooseDevelopmentCard(int stack)
+    {
+        chooseDevelopmentCardPanel.SetActive(false);
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+        Utils.RaiseEventForMaster(RaiseEventsCode.WinDevelopmentCard, new object[] { true, stack });
+    }
+
+
+    public void AddDevelopmentCard(int developmentCardType, RaiseEventsCode reportTo)
+    {
+        if (developmentCardType != (int)eDevelopmentCardsTypes.Constitution && developmentCardType != (int)eDevelopmentCardsTypes.Printer)
+        {
+            DevelopmentCard developmentCard = Instantiate(developmentCardsPrefabs[developmentCardType], developmentCardsContentPanel.transform).GetComponent<DevelopmentCard>();
+            developmentHand.Add(developmentCard);
+            SetDevelopmentCardsPanelActive(!developmentCardsPanel.interactable);
+            SetDevelopmentCardsPanelActive(!developmentCardsPanel.interactable);
+
+
+            GameObject background = PhotonNetwork.Instantiate(Consts.DisplayCardsPath + backgrounds[(int)developmentCard.color - 5].name, Vector3.zero, Quaternion.identity, 0, new object[] { playerSetup.playerPanel.photonView.ViewID, false });
+            developmentCard.Background = background;
+            if(developmentCardType == 0)
+            {
+                Alchemist alchemist = developmentCard as Alchemist;
+                alchemists.Add(alchemist, alchemist.GetComponent<CanvasGroup>());
+            }
+            if (developmentHand.Count == 5)
+            {
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.ThrowDevCard);
+                ThrowDevCards = true;
+                SetDevelopmentCardsPanelActive(true);
+                turnManager.ActivateAlchemists(true);
+            }
+            else
+            {
+                winDevFromAtt = false;
+                Utils.RaiseEventForMaster(reportTo);
+            }
+        }
+        else
+        {
+            playerSetup.playerPanel.photonView.RPC("AddVictoryPoints", RpcTarget.AllBufferedViaServer, 1);
+            if (developmentCardType == (int)eDevelopmentCardsTypes.Constitution)
+            {
+                PhotonNetwork.Instantiate(Consts.DisplayCardsPath + constitution.name, Vector3.zero, Quaternion.identity, 0, new object[] { playerSetup.playerPanel.photonView.ViewID, true });
+
+            }
+            else
+            {
+                PhotonNetwork.Instantiate(Consts.DisplayCardsPath + printer.name, Vector3.zero, Quaternion.identity, 0, new object[] { playerSetup.playerPanel.photonView.ViewID, true });
+            }
+            winDevFromAtt = false;
+            Utils.RaiseEventForMaster(reportTo);
+        }
+    }
+
+    public void DiscardDevelopmentCard(DevelopmentCard card)
+    {
+        SetDevelopmentCardsPanelActive(false);
+        playerSetup.cardDescriptionPanel.SetActive(false);
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+        turnManager.ActivateAlchemists(false);
+        PhotonNetwork.Destroy(card.Background);
+        Utils.RaiseEventForMaster(RaiseEventsCode.ReturnDevelopmentCard, new object[] { (int)card.type, (int)card.color, winDevFromAtt });
+        winDevFromAtt = false;
+        developmentHand.Remove(card);
+        if( card.type == eDevelopmentCardsTypes.Alchemist)
+        {
+            Alchemist alchemist = card as Alchemist;
+            alchemists.Remove(alchemist);
+        }
+        Destroy(card.gameObject);
+    }
+
+    #endregion
+
+    #region Development Cards Handlers
+
+    private void HandleSaboteur()
+    {
+        int numOfCards = resourcesHand.Count + commodityHand.Count;
+        state = eCardsState.Throw;
+        SetMainPanelActive(true);
+        numOfCardToThorw = numOfCards / 2;
+        cardsToThorw = new List<Card>(numOfCardToThorw);
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.Saboteur);
+        throwCardsPanel.SetActive(true);
+    }
+
+    public void SpyTake(DevelopmentCard card)
+    {
+        card.transform.SetParent(developmentCardsContentPanel.transform);
+        card.Background.GetComponent<PhotonView>().TransferOwnership(PhotonNetwork.LocalPlayer);
+        card.Background.GetPhotonView().RPC("SetParent", RpcTarget.AllBufferedViaServer, playerSetup.playerPanel.photonView.ViewID);
+        developmentHand.Add(card);
+        Spy spy = playerSetup.currentCard as Spy;
+        spy.Steal(card);
+    }
+
+    private void HandleWedding()
+    {
+        int cards = resourcesHand.Count + commodityHand.Count;
+        if (cards == 0)
+        {
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishWedding, GameManager.instance.CurrentPlayer, new object[] { new int[] { } });
+            return;
+        }
+        else if (cards == 1)
+        {
+            forcedCardsToGive = new List<Card>(cards);
+        }
+        else
+        {
+            forcedCardsToGive = new List<Card>(2);
+        }
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.Wedding);
+
+        SetMainPanelActive(true);
+        state = eCardsState.Give;
+        givePanel.SetActive(true);
+    }
+
+
+
+
+    public void HandleCommercialHarbor()
+    {
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, Consts.CommercialHarbor);
+        SetMainPanelActive(true);
+        state = eCardsState.Exchange;
+        exchangePanel.SetActive(true);
+    }
+
+    private void HandleResourceMonopoly(int type)
+    {
+        int cards = resourceCount[(eResources)type];
+        if (cards == 0)
+        {
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishResourceMonopoly, GameManager.instance.CurrentPlayer, new object[] { 0 });
+            return;
+        }
+        else if (cards == 1)
+        {
+            RemoveCardFromHandByType(type);
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishResourceMonopoly, GameManager.instance.CurrentPlayer, new object[] { 1 });
+            SetNumOfCardsInPanel();
+        }
+        else
+        {
+            RemoveCardFromHandByType(type);
+            RemoveCardFromHandByType(type);
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishResourceMonopoly, GameManager.instance.CurrentPlayer, new object[] { 2 });
+            SetNumOfCardsInPanel();
+            
+        }
+
+    }
+
+    private void HandleTradeMonopoly(int type)
+    {
+        int cards = commodityCount[(eCommodity)type];
+        if (cards == 0)
+        {
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishTradeMonopoly, GameManager.instance.CurrentPlayer, new object[] { 0 });
+            return;
+        }
+        else
+        {
+            RemoveCardFromHandByType(type);
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishTradeMonopoly, GameManager.instance.CurrentPlayer, new object[] { 1 });
+            SetNumOfCardsInPanel(); ;
+        }
+    }
+
+    public void GiveCards()
+    {
+        if (!Utils.IsFull(forcedCardsToGive)) return;
+        int[] types = new int [forcedCardsToGive.Count]; 
+        for (int i = 0; i < forcedCardsToGive.Count; i++)
+        {
+            Card card = forcedCardsToGive[i];
+            ResourceCard resourceCard = card as ResourceCard;
+
+            if (resourceCard != null)
+            {
+                types[i] = (int)resourceCard.resource;
+                RemoveResourceCardFromHand(resourceCard);
+            }
+            else
+            {
+                CommodityCard commodityCard = card as CommodityCard;
+                types[i] = (int)commodityCard.commodity;
+                RemoveCommodityCardFromHand(commodityCard);
+            }
+        }
+        forcedCardsToGive.Clear();
+        state = eCardsState.None;
+        givePanel.SetActive(false);
+        SetMainPanelActive(false);
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+        SetNumOfCardsInPanel();
+        switch (playerSetup.currentCardType)
+        {
+            case eDevelopmentCardsTypes.Wedding:
+                Utils.RaiseEventForPlayer(RaiseEventsCode.FinishWedding, GameManager.instance.CurrentPlayer, new object[] { types });
+                break;
+        }
+    }
+
+
+    public void ExchangeCards()
+    {
+        if (exchangeCard == null) return;
+        int type;
+        ResourceCard resourceCard = exchangeCard as ResourceCard;
+        if (resourceCard != null)
+        {
+            type = (int)resourceCard.resource;
+        }
+        else
+        {
+            CommodityCard commodityCard = exchangeCard as CommodityCard;
+            type = (int)commodityCard.commodity;
+        }
+
+        state = eCardsState.None;
+        exchangePanel.SetActive(false);
+        SetMainPanelActive(false);
+        if(GameManager.instance.CurrentPlayer == PhotonNetwork.LocalPlayer.ActorNumber)
+        {
+            playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, true);
+            CommercialHarbor commercialHarbor = playerSetup.currentCard as CommercialHarbor;
+            commercialHarbor.PlayerReady = type;
+            if (commercialHarbor.ExchangeReady())
+                commercialHarbor.MakeExchange();
+        }
+        else
+        {
+            playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishCommercialHarbor, GameManager.instance.CurrentPlayer, new object[] { type });
+
+        }
+    }
+
+    public void TakeCards()
+    {
+        if (!Utils.IsFull(cardsToTake)) return;
+        int[] types = new int[cardsToTake.Count];
+        for (int i = 0; i < cardsToTake.Count; i++)
+        {
+            Card card = cardsToTake[i];
+            ResourceCard resourceCard = card as ResourceCard;
+            if (resourceCard != null)
+            {
+                types[i] = (int)resourceCard.resource;
+                AddResourceCardToHand(resourceCard, true);
+            }
+            else
+            {
+                CommodityCard commodityCard = card as CommodityCard;
+                types[i] = (int)commodityCard.commodity;
+                AddCommodityCardToHand(commodityCard, true);
+            }
+        }
+        cardsToTake.Clear();
+        state = eCardsState.None;
+        playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, true);
+        SetNumOfCardsInPanel();
+        
+        
+        MasterMerchant masterMerchant = playerSetup.currentCard as MasterMerchant;
+        
+        Utils.RaiseEventForPlayer(RaiseEventsCode.CompleteMasterMerchant, masterMerchant.Rival, new object[] { types });
+        masterMerchant.CleanUp();
+
+    }
+
+
+    public void SetMerchant(eResources resource)
+    {
+        if(merchantPort != -1)
+        {
+            RemoveMerchant();
+        }
+        merchantPort = (int)resource;
+        if(resource != eResources.Desert)
+            UpdatePortText((int)resource, Consts.p2to1);
+    }
+
+    public void RemoveMerchant()
+    {
+        if(merchantPort != 100)
+        {
+            RemovePort((eResources)merchantPort);
+        }
+        merchantPort = -1;
+    }
+
+
+    public void AddMerchantFleet(int type)
+    {
+        merchantFleetPorts.Add((eResources)type);
+        ((MerchantFleet)playerSetup.currentCard).CleanUp();
+        UpdatePortText(type, Consts.p2to1);
+    }
+
+    public void RemovePort(eResources resource)
+    {
+        ePorts port = ports[resource];
+        switch (port)
+        {
+            case ePorts.p4To1:
+                UpdatePortText((int)resource, Consts.p4to1);
+                break;
+            case ePorts.p3To1:
+                UpdatePortText((int)resource, Consts.p3to1);
+                break;
+            case ePorts.p2To1:
+                UpdatePortText((int)resource, Consts.p2to1);
+                break;
+        }
+    }
+
+    public void RemoveMerchantFleets()
+    {
+        foreach(eResources resource in merchantFleetPorts)
+        {
+            RemovePort(resource);
+        }
+        merchantFleetPorts.Clear();
+    }
+
+
+    public void StartMonopoly(int type)
+    {
+        int[] rivals = GameManager.instance.players.Select((x) => x.ActorNumber).Where((x) => x != PhotonNetwork.LocalPlayer.ActorNumber).ToArray();
+        if(type <= 4)
+        {
+            ResourceMonopoly rm = playerSetup.currentCard as ResourceMonopoly;
+            rm.Resource = type;
+            Utils.RaiseEventForGroup(RaiseEventsCode.ResourceMonopoly, rivals, new object[] { type });
+
+        }
+        else
+        {
+            TradeMonopoly tm = playerSetup.currentCard as TradeMonopoly;
+            tm.Commodity = type;
+            Utils.RaiseEventForGroup(RaiseEventsCode.TradeMonopoly, rivals, new object[] { type });
+        }
+
+    }
 
     #endregion
 }

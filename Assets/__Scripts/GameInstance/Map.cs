@@ -23,6 +23,7 @@ public class Map : MonoBehaviourPun
     public GameObject openSpotVertexPrefab;
     public GameObject openSpotEdgePrefab;
     public GameObject robberPrefab;
+    public GameObject merchantPrefab;
 
     public GameObject[] ports;
     public TextAsset layoutJSON;
@@ -71,10 +72,15 @@ public class Map : MonoBehaviourPun
 
     private int robberViewID;
     private int barbariansViewID;
+    private int merchantViewID;
 
     // keys are veretex IDs, Values are 0-5 where 0-4 indicate which eResource this is, and 5 indicates that this is a "any" port (3:1)
     private Dictionary<int, int> vertexPorts = new Dictionary<int, int>();
 
+
+    private List<int> coinCards;
+    private List<int> paperCards;
+    private List<int> silkCards;
     #endregion
 
 
@@ -92,6 +98,43 @@ public class Map : MonoBehaviourPun
             };
 
         portType = new List<eResources>() { eResources.Brick, eResources.Ore, eResources.Wheat, eResources.Wood, eResources.Wool };
+
+        coinCards = new List<int>()
+        { 
+            (int)eDevelopmentCardsTypes.Bishop, (int)eDevelopmentCardsTypes.Bishop,
+            (int)eDevelopmentCardsTypes.Constitution,
+            (int)eDevelopmentCardsTypes.Deserter, (int)eDevelopmentCardsTypes.Deserter,
+            (int)eDevelopmentCardsTypes.Diplomat, (int)eDevelopmentCardsTypes.Diplomat,
+            (int)eDevelopmentCardsTypes.Intrigue, (int)eDevelopmentCardsTypes.Intrigue,
+            (int)eDevelopmentCardsTypes.Saboteur, (int)eDevelopmentCardsTypes.Saboteur,
+            (int)eDevelopmentCardsTypes.Spy, (int)eDevelopmentCardsTypes.Spy, (int)eDevelopmentCardsTypes.Spy,
+            (int)eDevelopmentCardsTypes.Warlord, (int)eDevelopmentCardsTypes.Warlord,
+            (int)eDevelopmentCardsTypes.Wedding, (int)eDevelopmentCardsTypes.Wedding
+        };
+
+        paperCards = new List<int>()
+        {   
+            (int)eDevelopmentCardsTypes.Alchemist, (int)eDevelopmentCardsTypes.Alchemist,
+            (int)eDevelopmentCardsTypes.Crane, (int)eDevelopmentCardsTypes.Crane,
+            (int)eDevelopmentCardsTypes.Engineer,
+            (int)eDevelopmentCardsTypes.Inventor, (int)eDevelopmentCardsTypes.Inventor,
+            (int)eDevelopmentCardsTypes.Irrigation, (int)eDevelopmentCardsTypes.Irrigation,
+            (int)eDevelopmentCardsTypes.Medicine, (int)eDevelopmentCardsTypes.Medicine,
+            (int)eDevelopmentCardsTypes.Mining, (int)eDevelopmentCardsTypes.Mining,
+            (int)eDevelopmentCardsTypes.Printer,
+            (int)eDevelopmentCardsTypes.RoadBuilding, (int)eDevelopmentCardsTypes.RoadBuilding,
+            (int)eDevelopmentCardsTypes.Smith, (int)eDevelopmentCardsTypes.Smith
+        };
+
+        silkCards = new List<int>()
+        {   
+            (int)eDevelopmentCardsTypes.CommercialHarbor, (int)eDevelopmentCardsTypes.CommercialHarbor,
+            (int)eDevelopmentCardsTypes.MasterMerchant, (int)eDevelopmentCardsTypes.MasterMerchant,
+            (int)eDevelopmentCardsTypes.Merchant, (int)eDevelopmentCardsTypes.Merchant, (int)eDevelopmentCardsTypes.Merchant, (int)eDevelopmentCardsTypes.Merchant, (int)eDevelopmentCardsTypes.Merchant, (int)eDevelopmentCardsTypes.Merchant,
+            (int)eDevelopmentCardsTypes.MerchantFleet, (int)eDevelopmentCardsTypes.MerchantFleet,
+            (int)eDevelopmentCardsTypes.ResourceMonopoly, (int)eDevelopmentCardsTypes.ResourceMonopoly, (int)eDevelopmentCardsTypes.ResourceMonopoly, (int)eDevelopmentCardsTypes.ResourceMonopoly,
+            (int)eDevelopmentCardsTypes.TradeMonopoly, (int)eDevelopmentCardsTypes.TradeMonopoly
+        };
 
         layout = GetComponent<Layout>();
         layout.ReadLayout(layoutJSON.text);
@@ -133,11 +176,13 @@ public class Map : MonoBehaviourPun
 
         InitAnchors();
         Shuffle(ref resources);
+        Shuffle(ref resources);
         Shuffle(ref portType);
         InitTiles();
         InitWaterTiles();
         InitVertexes();
         InitEdges();
+        InitDevelopmentCards();
         SendMapViewIDs();
         GameManager.instance.StartGameSetup();
     }
@@ -194,6 +239,11 @@ public class Map : MonoBehaviourPun
                                                                     robberPrefab.transform.rotation, 0, new object[] { tileViewID }).GetComponent<PhotonView>();
                 robberPhotonView.RPC("SetPlayerManagers", RpcTarget.AllBufferedViaServer);
                 robberViewID = robberPhotonView.ViewID;
+
+                PhotonView merchantPhotonView = PhotonNetwork.InstantiateRoomObject(merchantPrefab.name, merchantPrefab.transform.position,
+                                                                    merchantPrefab.transform.rotation, 0, new object[] { tileViewID }).GetComponent<PhotonView>();
+                robberPhotonView.RPC("SetPlayerManagers", RpcTarget.AllBufferedViaServer);
+                merchantViewID = merchantPhotonView.ViewID;
                 desert_assigned = true;
                 continue;
             }
@@ -255,6 +305,24 @@ public class Map : MonoBehaviourPun
         // Replace the original List with the temporary List
         resources = tResources;
     }
+    private void Shuffle(ref List<int> developmentCards)
+    {
+        // Create a temporary List to hold the new shuffle order
+        List<int> tDevelopmentCards = new List<int>();
+        int ndx; // This will hold the index of the card to be moved
+        // Repeat as long as there are cards in the original List
+        while (developmentCards.Count > 0)
+        {
+            // Pick the index of a random card
+            ndx = UnityEngine.Random.Range(0, developmentCards.Count);
+            // Add that card to the temporary List
+            tDevelopmentCards.Add(developmentCards[ndx]);
+            // And remove that card from the original List
+            developmentCards.RemoveAt(ndx);
+        }
+        // Replace the original List with the temporary List
+        developmentCards = tDevelopmentCards;
+    }
 
 
 
@@ -313,6 +381,16 @@ public class Map : MonoBehaviourPun
     }
 
 
+    public void InitDevelopmentCards()
+    {
+        Shuffle(ref coinCards);
+        Shuffle(ref coinCards);
+        Shuffle(ref paperCards);
+        Shuffle(ref paperCards);
+        Shuffle(ref silkCards);
+        Shuffle(ref silkCards);
+    }
+
 
     #endregion
 
@@ -322,7 +400,17 @@ public class Map : MonoBehaviourPun
 
     void SendMapViewIDs()
     {
-        object[] data = new object[] { diceGameObject.GetComponent<PhotonView>().ViewID, tilesViewIDs, openSpotVertexesViewIDs, openSpotEdgesViewIDs, robberViewID, barbariansViewID };
+        object[] data = new object[] { diceGameObject.GetComponent<PhotonView>().ViewID,
+                                       tilesViewIDs,
+                                       openSpotVertexesViewIDs,
+                                       openSpotEdgesViewIDs,
+                                       robberViewID,
+                                       barbariansViewID,
+                                       merchantViewID,
+                                       coinCards.ToArray(),
+                                       paperCards.ToArray(),
+                                       silkCards.ToArray()
+                                     };
 
         RaiseEventOptions raiseEventOptions = new RaiseEventOptions
         {

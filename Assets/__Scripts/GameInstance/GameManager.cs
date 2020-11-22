@@ -5,8 +5,7 @@ using Photon.Realtime;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
-
-
+using System.Linq;
 
 public class GameManager : MonoBehaviourPunCallbacks
 {
@@ -32,7 +31,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     private int preGameCounter = 0;
     private int gameCounter;
 
-    private Dictionary<eCommodity, int[]> cityImprovementHolder = new Dictionary<eCommodity, int[]>()
+    public  Dictionary<eCommodity, int[]> cityImprovementHolder = new Dictionary<eCommodity, int[]>()
     {
         { eCommodity.Coin, new int[]{-1, 4} },
         { eCommodity.Paper, new int[]{-1, 4} },
@@ -46,7 +45,16 @@ public class GameManager : MonoBehaviourPunCallbacks
     private List<int> tiedRoadPlayers = new List<int>();
     private int tiedRoadsToPass;
 
+
+    public Dictionary<int, int> playerPoints = new Dictionary<int, int>();
+
+    public Dictionary<eCommodity, List<eDevelopmentCardsTypes>> developmentCards;
+
     public int CurrentPlayer { get { return playerActorIDs[currentPlayer]; } }
+
+    public Dictionary<int, bool> playerDevelopmentCardRes = new Dictionary<int, bool>();
+
+
 
     void Awake()
     {
@@ -56,7 +64,9 @@ public class GameManager : MonoBehaviourPunCallbacks
         for (int i = 0; i<players.Length; i++)
         {
             playerLongestRoads.Add(players[i].ActorNumber, 0);
+            playerPoints.Add(players[i].ActorNumber, 0);
             playerActorIDs[i] = players[i].ActorNumber;
+            playerDevelopmentCardRes.Add(players[i].ActorNumber, false);
         }
     }
 
@@ -90,6 +100,22 @@ public class GameManager : MonoBehaviourPunCallbacks
         object[] data;
         switch (photonEvent.Code)
         {
+            case (byte)RaiseEventsCode.SendMapData:
+                if (!PhotonNetwork.IsMasterClient) return;
+                data = (object[])photonEvent.CustomData;
+                developmentCards = new Dictionary<eCommodity, List<eDevelopmentCardsTypes>>();
+                developmentCards.Add(eCommodity.Coin, new List<eDevelopmentCardsTypes>());
+                developmentCards.Add(eCommodity.Paper, new List<eDevelopmentCardsTypes>());
+                developmentCards.Add(eCommodity.Silk, new List<eDevelopmentCardsTypes>());
+
+                for(int i = 7; i<10; i++)
+                {
+                    foreach(int type in (int[])data[i])
+                    {
+                        developmentCards[(eCommodity)i - 2].Add((eDevelopmentCardsTypes)type);
+                    }
+                }
+                break;
             case (byte)RaiseEventsCode.SetRandomPlayer:
                 data = (object[])photonEvent.CustomData;
                 currentPlayer = (int)data[0];
@@ -135,19 +161,29 @@ public class GameManager : MonoBehaviourPunCallbacks
                 if(cityImprovementHolder[commodity][0] == photonEvent.Sender)
                 {
                     cityImprovementHolder[commodity][1] = improvementLevel;
+                    if(PhotonNetwork.IsMasterClient)
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.GainTurnControl, photonEvent.Sender);
                     return;
                 }
                 else if (cityImprovementHolder[commodity][0] == -1)
                 {
                     cityImprovementHolder[commodity][0] = photonEvent.Sender;
-                    Utils.RaiseEventForPlayer(RaiseEventsCode.ImproveCity, photonEvent.Sender, new object[] { data[0] });
+                    if (PhotonNetwork.IsMasterClient)
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.ImproveCity, photonEvent.Sender, new object[] { data[0] });
                 }
                 else if(cityImprovementHolder[commodity][1] < improvementLevel)
                 {
-                    Utils.RaiseEventForPlayer(RaiseEventsCode.LoseImproveCity, cityImprovementHolder[commodity][0], new object[] { data[0] });
+                    if (PhotonNetwork.IsMasterClient)
+                    {
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.LoseImproveCity, cityImprovementHolder[commodity][0], new object[] { data[0] });
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.TakeImproveCity, photonEvent.Sender, new object[] { data[0] });
+                    }
                     cityImprovementHolder[commodity][0] = photonEvent.Sender;
                     cityImprovementHolder[commodity][1] = improvementLevel;
-                    Utils.RaiseEventForPlayer(RaiseEventsCode.TakeImproveCity, photonEvent.Sender, new object[] { data[0] });
+                }
+                else
+                {
+                    Utils.RaiseEventForPlayer(RaiseEventsCode.GainTurnControl, photonEvent.Sender);
                 }
                 break;
             case (byte)RaiseEventsCode.ActivateRobber:
@@ -156,6 +192,51 @@ public class GameManager : MonoBehaviourPunCallbacks
             case (byte)RaiseEventsCode.SetLongestRoad:
                 data = (object[])photonEvent.CustomData;
                 HandleLongestRoad((int)data[0], photonEvent.Sender);
+                break;
+            case (byte)RaiseEventsCode.UpdatePointsForAll:
+                data = (object[])photonEvent.CustomData;
+                playerPoints[photonEvent.Sender] += (int)data[0];
+                break;
+            case (byte)RaiseEventsCode.GiveDevelopmentCard:
+                if (!PhotonNetwork.IsMasterClient) return;
+                data = (object[])photonEvent.CustomData;
+                if ((bool)data[0])
+                {
+                    GetAndSendDevelopmentCard((eCommodity)data[1], photonEvent.Sender, RaiseEventsCode.SendDevelopmentCardFromRoll);
+                }
+                else
+                {
+                    playerDevelopmentCardRes[photonEvent.Sender] = true;
+                    ContinueAfterDevelopmentCardsHandout();
+                }
+                break;
+            case (byte)RaiseEventsCode.ReturnDevelopmentCardAfterUsage:
+                data = (object[])photonEvent.CustomData;
+                ReturnDevelopmentCard((eDevelopmentCardsTypes)data[0], (eCommodity)data[1]);
+                break;
+            case (byte)RaiseEventsCode.ReturnDevelopmentCard:
+                data = (object[])photonEvent.CustomData;
+
+                ReturnDevelopmentCard((eDevelopmentCardsTypes)data[0], (eCommodity)data[1]);
+
+                if ((bool)data[2])
+                {
+                    Utils.RaiseEventForMaster(RaiseEventsCode.FinishDevelopmentCardWinHandout);
+                }
+                else
+                {
+                    playerDevelopmentCardRes[photonEvent.Sender] = true;
+                    ContinueAfterDevelopmentCardsHandout();
+                }
+                break;
+            case (byte)RaiseEventsCode.FinishDevelopmentCardRollHandout:
+                playerDevelopmentCardRes[photonEvent.Sender] = true;
+                ContinueAfterDevelopmentCardsHandout();
+                break;
+            case (byte)RaiseEventsCode.WinDevelopmentCard:
+                data = (object[])photonEvent.CustomData;
+                GetAndSendDevelopmentCard((eCommodity)data[1], photonEvent.Sender, RaiseEventsCode.SendDevelopmentCardFromWin);
+
                 break;
             case (byte)RaiseEventsCode.GameOver:
                 data = (object[])photonEvent.CustomData;
@@ -233,6 +314,7 @@ public class GameManager : MonoBehaviourPunCallbacks
                 longestRoadState = eLongestRoadState.Player;
                 playerHoldingLongestRoad = sender;
                 Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, sender, new object[] { 2 });
+                Utils.RaiseEventForPlayer(RaiseEventsCode.ActivateLongestRoad, sender, new object[] { true });
                 break;
 
             case eLongestRoadState.Player:
@@ -246,8 +328,11 @@ public class GameManager : MonoBehaviourPunCallbacks
                     if (roadLength > playerLongestRoads[playerHoldingLongestRoad])
                     {
                         Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, playerHoldingLongestRoad, new object[] { -2 });
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.ActivateLongestRoad, playerHoldingLongestRoad, new object[] { false });
                         playerHoldingLongestRoad = sender;
                         Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, sender, new object[] { 2 });
+                        Utils.RaiseEventForPlayer(RaiseEventsCode.ActivateLongestRoad, sender, new object[] { true });
+
                     }
                 }
                 break;
@@ -257,6 +342,7 @@ public class GameManager : MonoBehaviourPunCallbacks
                     playerHoldingLongestRoad = sender;
                     longestRoadState = eLongestRoadState.Player;
                     Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, sender, new object[] { 2 });
+                    Utils.RaiseEventForPlayer(RaiseEventsCode.ActivateLongestRoad, sender, new object[] { true });
                 }
                 break;
         }
@@ -281,6 +367,7 @@ public class GameManager : MonoBehaviourPunCallbacks
         if(tiedRoadPlayers.Count == 0)
         {
             Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, playerHoldingLongestRoad, new object[] { -2 });
+            Utils.RaiseEventForPlayer(RaiseEventsCode.ActivateLongestRoad, playerHoldingLongestRoad, new object[] { false });
             longestRoadState = eLongestRoadState.Game;
         }
         else if (tiedRoadPlayers.Count == 1)
@@ -288,15 +375,19 @@ public class GameManager : MonoBehaviourPunCallbacks
             if (tiedRoadPlayers[0] != playerHoldingLongestRoad)
             {
                 Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, playerHoldingLongestRoad, new object[] { -2 });
+                Utils.RaiseEventForPlayer(RaiseEventsCode.ActivateLongestRoad, playerHoldingLongestRoad, new object[] { false });
 
                 playerHoldingLongestRoad = tiedRoadPlayers[0];
                 Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, sender, new object[] { 2 });
+                Utils.RaiseEventForPlayer(RaiseEventsCode.ActivateLongestRoad, sender, new object[] { true });
+
             }
             tiedRoadPlayers.Clear();
         }
         else
         {
             Utils.RaiseEventForPlayer(RaiseEventsCode.AddPoints, playerHoldingLongestRoad, new object[] { -2 });
+            Utils.RaiseEventForPlayer(RaiseEventsCode.ActivateLongestRoad, playerHoldingLongestRoad, new object[] { false });
             longestRoadState = eLongestRoadState.Tie;
             tiedRoadsToPass = maxLength;
             tiedRoadPlayers.Clear();
@@ -304,6 +395,40 @@ public class GameManager : MonoBehaviourPunCallbacks
     }
 
 
+    private void GetAndSendDevelopmentCard(eCommodity stack, int sender, RaiseEventsCode winWay)
+    {
+        int cardType = (int)developmentCards[stack][0];
+        developmentCards[stack].RemoveAt(0);
+        Utils.RaiseEventForPlayer(winWay, sender, new object[] { cardType });
+    }
+
+    public bool AllFinished()
+    {
+        foreach (bool res in playerDevelopmentCardRes.Values)
+        {
+            if (!res) return false;
+        }
+        return true;
+    }
+
+
+    private void ContinueAfterDevelopmentCardsHandout()
+    {
+        if (AllFinished())
+        {
+            int[] actors = playerDevelopmentCardRes.Keys.ToArray();
+            foreach (int actor in actors)
+            {
+                playerDevelopmentCardRes[actor] = false;
+            }
+            Utils.RaiseEventForPlayer(RaiseEventsCode.SendDiceScore, CurrentPlayer);
+        }
+    }
+
+    private void ReturnDevelopmentCard(eDevelopmentCardsTypes dCardType, eCommodity stack)
+    {
+        developmentCards[stack].Add(dCardType);
+    }
 
     public void GameOver(string playerName, string playerColor)
     {

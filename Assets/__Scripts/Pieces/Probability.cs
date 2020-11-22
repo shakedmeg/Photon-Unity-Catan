@@ -20,9 +20,17 @@ public class Probability : MonoBehaviourPun
             tNumber.color = new Color32(176, 41, 41, 255);
         }
 
-        transform.SetParent(PhotonView.Find((int)data[1]).gameObject.transform);
+        Tile tile = PhotonView.Find((int)data[1]).GetComponent<Tile>();
+        transform.SetParent(tile.gameObject.transform);
+        tile.probability = this;
         transform.localPosition = Vector3.back;
 
+    }
+
+    [PunRPC]
+    public void SetProb(string number)
+    {
+        tNumber.text = number;
     }
     
 }

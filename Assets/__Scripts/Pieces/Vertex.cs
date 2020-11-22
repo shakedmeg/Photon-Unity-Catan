@@ -95,6 +95,48 @@ public class Vertex : MonoBehaviourPun
         data = new List<object>() { buildManager.playerColor };
         p1 = transform.position;
         p0 = transform.position;
+
+        if(playerSetup.currentCard != null)
+        {
+            Deserter deserter = playerSetup.currentCard as Deserter;
+            buildManager.KnightCleanUp();
+            GameObject knightPrefab;
+            int lvl = deserter.MaxBuildableLvl;
+            eBuilding knightLvl = (eBuilding)(lvl + 4);
+
+            if(lvl == 3)
+                knightPrefab = knightLvl3Prefab;
+            else if(lvl == 2)
+                knightPrefab = knightLvl2Prefab;
+            else
+                knightPrefab = knightLvl1Prefab;
+
+            BuildKnight(knightPrefab, knightLvl);
+            knight.SetLevel(lvl);
+            knight.photonView.RPC("SetLevel", RpcTarget.AllBufferedViaServer, lvl);
+            AddKnight();
+
+            if (deserter.DesertedKnightActive)
+            {
+                knight.Useable = true;
+                knight.TurnOnKnight();
+            }
+            deserter.CleanUp();
+            return;
+        }
+
+        if(playerSetup.currentCardType == eDevelopmentCardsTypes.Intrigue)
+        {
+            buildManager.TurnOffKnightOptions();
+            MoveKnight();
+            playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+            Utils.RaiseEventForPlayer(RaiseEventsCode.FinishIntrigue, buildManager.notifyToPlayer);
+            return;
+        }
+
+
+
+
         switch (buildManager.Build)
         {
             case eBuildAction.Settlement:
@@ -130,8 +172,8 @@ public class Vertex : MonoBehaviourPun
 
 
             case eBuildAction.Knight:
-                BuildKnight();
-                //buildManager.KnightCleanUp();
+                BuildKnight(knightLvl1Prefab, eBuilding.Knight);
+                AfterBuild();
                 AddKnight();
                 break;
 
@@ -150,6 +192,7 @@ public class Vertex : MonoBehaviourPun
             case eKnightActions.MoveKnight:
                 buildManager.TurnOffKnightOptions();
                 MoveKnight();
+                playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
                 Utils.RaiseEventForPlayer(RaiseEventsCode.FinishMoveKnight, buildManager.notifyToPlayer, new object[]{ buildManager.displacedKnightPervId });
 
                 break;
@@ -220,7 +263,6 @@ public class Vertex : MonoBehaviourPun
 
 
         Build(ref city, cityPrefab.name, Quaternion.Euler(270,0,0), data, eBuilding.City);
-        AfterBuild();
 
         buildManager.settlementsInGame -= 1;
         buildManager.buildingAmounts[eBuilding.Settlement] = buildManager.settlementsInGame >= 5 ? 0 : 5 - buildManager.settlementsInGame;
@@ -271,7 +313,7 @@ public class Vertex : MonoBehaviourPun
 
     public void AfterBuild()
     {
-        cardManager.Pay();
+        cardManager.Pay(Consts.Prices[buildManager.Build]);
         buildManager.CleanUp();
     }
 
@@ -279,14 +321,13 @@ public class Vertex : MonoBehaviourPun
 
 
     #region Knights
-    public void BuildKnight()
+    public void BuildKnight(GameObject knightPrefab, eBuilding knightLvl)
     {
         p1 = transform.position + new Vector3(0, Consts.DROP_HIGHET, 0);
         p0 = transform.position + Vector3.up;
         buildManager.vertexesToTurnOff.Remove(ID);
         buildManager.knightsToTurnOff.Remove(ID);
-        Build(ref knight, knightLvl1Prefab.name, knightLvl1Prefab.transform.rotation, data, eBuilding.Knight);
-        AfterBuild();
+        Build(ref knight, knightPrefab.name, knightPrefab.transform.rotation, data, knightLvl);
 
         PhotonView knightPhotonView = knight.GetComponent<PhotonView>();
         photonView.RPC("SetKnight", RpcTarget.AllBufferedViaServer, knightPhotonView.ViewID);
@@ -296,7 +337,18 @@ public class Vertex : MonoBehaviourPun
 
     public void UpgradeKnight()
     {
-        data.AddRange(new object[] { knight.Activated, knight.Level +1, knight.Useable });
+        BuildUpgradedKnight();
+        AfterBuild();
+
+        data = new List<object>() { buildManager.playerColor };
+        p1 = transform.position;
+        p0 = transform.position;
+
+    }
+
+    public void BuildUpgradedKnight()
+    {
+        data.AddRange(new object[] { knight.Activated, knight.Useable });
         p1 = transform.position + new Vector3(0, Consts.DROP_HIGHET, 0);
         p0 = transform.position + Vector3.up;
         PhotonNetwork.Destroy(knight.gameObject);
@@ -304,26 +356,25 @@ public class Vertex : MonoBehaviourPun
         if (Building == eBuilding.Knight)
         {
             Build(ref knight, knightLvl2Prefab.name, knightLvl2Prefab.transform.rotation, data, eBuilding.Knight2);
+            knight.photonView.RPC("SetLevel", RpcTarget.AllBufferedViaServer, 2);
             buildManager.buildingAmounts[eBuilding.Knight] += 1;
             playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)eBuilding.Knight - 1, buildManager.buildingAmounts[eBuilding.Knight].ToString());
         }
         else
         {
             Build(ref knight, knightLvl3Prefab.name, knightLvl3Prefab.transform.rotation, data, eBuilding.Knight3);
+            knight.photonView.RPC("SetLevel", RpcTarget.AllBufferedViaServer, 3);
             buildManager.buildingAmounts[eBuilding.Knight2] += 1;
             playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)eBuilding.Knight2 - 1, buildManager.buildingAmounts[eBuilding.Knight2].ToString());
-
         }
-        AfterBuild();
+        if (knight.Activated)
+        {
+            playerSetup.playerPanel.photonView.RPC("SetActivatedKnightsText", RpcTarget.AllBufferedViaServer, 1);
+        }
         PhotonView knightPhotonView = knight.GetComponent<PhotonView>();
         photonView.RPC("SetKnight", RpcTarget.AllBufferedViaServer, knightPhotonView.ViewID);
-
-
-        data = new List<object>() { buildManager.playerColor };
-        p1 = transform.position;
-        p0 = transform.position;
-
     }
+
 
     public void MoveKnight()
     {
@@ -352,6 +403,18 @@ public class Vertex : MonoBehaviourPun
     }
 
 
+    public void DestroyKnight()
+    {
+        if (knight.Activated)
+        {
+            turnManager.barbarians.photonView.RPC("DeactivateKnight", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, knight.Level);
+            playerSetup.playerPanel.photonView.RPC("SetActivatedKnightsText", RpcTarget.AllBufferedViaServer, (-1)*knight.Level);
+        }
+        buildManager.buildingAmounts[Building] += 1;
+        playerSetup.playerPanel.photonView.RPC("SetBuildingText", RpcTarget.AllBufferedViaServer, (int)Building - 1, buildManager.buildingAmounts[Building].ToString());
+        PhotonNetwork.Destroy(knight.gameObject);
+        RemoveKnightFromVertex();
+    }
 
 
 

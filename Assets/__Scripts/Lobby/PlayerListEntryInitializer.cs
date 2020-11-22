@@ -32,7 +32,6 @@ public class PlayerListEntryInitializer : MonoBehaviour
         if (opResponse.OperationCode == OperationCode.SetProperties &&
             opResponse.ReturnCode == ErrorCode.InvalidOperation)
         {
-            Debug.LogError(opResponse.DebugMessage);
             // CAS failure
             // we will assign color again
         }
@@ -124,7 +123,6 @@ public class PlayerListEntryInitializer : MonoBehaviour
             PhotonNetwork.CurrentRoom.SetCustomProperties(customRoomProperties);
         }
 
-        Debug.LogError(colorName);
         // assign color to the player custom properties and dropdown value
         int value = -1;
         switch (colorName)
@@ -146,7 +144,6 @@ public class PlayerListEntryInitializer : MonoBehaviour
                 break;
         }
 
-        Debug.LogError("Player " + PhotonNetwork.LocalPlayer.ActorNumber);
 
         ExitGames.Client.Photon.Hashtable initialProps = new ExitGames.Client.Photon.Hashtable() { { Consts.PLAYER_COLOR, colorName } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(initialProps);
@@ -194,7 +191,6 @@ public class PlayerListEntryInitializer : MonoBehaviour
             PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(Consts.COLORS_OWNER, out owner);
             int currentOwner = (int)owner;
             ExitGames.Client.Photon.Hashtable customRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.ROOM_COLORS, allowedColors.ToArray() }, { Consts.COLORS_OWNER, PhotonNetwork.LocalPlayer.ActorNumber } };
-            Debug.LogError("Hunt this " + currentOwner);
             if (currentOwner != -1)
             {
                 ExitGames.Client.Photon.Hashtable expectedCustomRoomProperties = new ExitGames.Client.Photon.Hashtable() { { Consts.COLORS_OWNER, currentOwner } };

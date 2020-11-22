@@ -84,6 +84,7 @@ public class TurnManager : MonoBehaviourPun
                 break;
             case (byte)RaiseEventsCode.StartTurn:
                 if (!photonView.IsMine) return;
+                ActivateAlchemists(true);
                 Dice.InitScaleUpDown(Consts.DiceRegularScale, Consts.ScaleDice);
                 buildManager.SetUsableKnights();
                 break;
@@ -123,6 +124,7 @@ public class TurnManager : MonoBehaviourPun
     {
         if (!photonView.IsMine) return;
         SetControl(true);
+        cardManager.SetDevelopmentCardsPanelActive(true);
     }
 
     public void PassTurn()
@@ -134,8 +136,10 @@ public class TurnManager : MonoBehaviourPun
         cardManager.SetMainPanelActive(false);
         cardManager.CloseTrade();
         cardManager.ClearOffers();
+        cardManager.RemoveMerchantFleets();
         ButtonsPanel.gameObject.SetActive(false);
         playerSetup.playerPanel.photonView.RPC("MakeActive", RpcTarget.AllBufferedViaServer, false);
+        cardManager.SetDevelopmentCardsPanelActive(false);
         Utils.RaiseEventForAll(RaiseEventsCode.PassTurn);
 
     }
@@ -147,6 +151,7 @@ public class TurnManager : MonoBehaviourPun
         ButtonsPanel.gameObject.SetActive(flag);
         SetKnightsCollider(flag);
         cardManager.SetMainPanelActive(flag);
+        cardManager.SetDevelopmentCardsPanelActive(flag);
 
     }
 
@@ -156,7 +161,7 @@ public class TurnManager : MonoBehaviourPun
         foreach (Vertex vertex in buildManager.PlayerKnights.Values)
         {
             Knight knight = vertex.knight;
-            if (knight.Activated)
+            if (knight.Useable)
                 knight.SetCollider(flag);
         }
     }
@@ -171,4 +176,12 @@ public class TurnManager : MonoBehaviourPun
 
     #endregion
 
+
+    public void ActivateAlchemists(bool flag)
+    {
+        foreach(CanvasGroup alchemist in cardManager.alchemists.Values)
+        {
+            alchemist.interactable = flag;
+        }
+    }
 }

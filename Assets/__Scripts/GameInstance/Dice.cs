@@ -17,7 +17,6 @@ public class Dice : MonoBehaviourPun
 
     private PlayerSetup playerSetup;
     private TurnManager turnManager;
-    private CardManager cardManager;
 
     private Barbarians barbarians;
 
@@ -28,9 +27,7 @@ public class Dice : MonoBehaviourPun
 
     private GreenLvl3Players greenLvl3Players = new GreenLvl3Players();
 
-    private List<Vector3> quats = new List<Vector3>() {
-        new Vector3(90, 0 , 0), new Vector3(0, 90, 0), new Vector3(0, 0, 0), new Vector3(180, 0, 0), new Vector3(0, 270, 0), new Vector3(270, 0, 0)
-    };
+    
 
 
     private Vector3 s0, s1;
@@ -103,24 +100,30 @@ public class Dice : MonoBehaviourPun
     }
 
     void OnMouseDown() {
+        turnManager.ActivateAlchemists(false);
         StopScaling();
         int yellowDiceNum = Random.Range(0, 6);
         int redDiceNum = Random.Range(0, 6);
         int eventDiceNum = Random.Range(0, 6);
+
+        HandleResults(yellowDiceNum, redDiceNum, eventDiceNum);
+
+    }
+
+    public void HandleResults(int yellowDiceNum, int redDiceNum, int eventDiceNum)
+    {        
+        this.photonView.RPC("SetDice", RpcTarget.AllViaServer, yellowDiceNum, redDiceNum, eventDiceNum);
         score = yellowDiceNum + redDiceNum + 2;
 
-        this.photonView.RPC("SetDice", RpcTarget.AllViaServer, yellowDiceNum, redDiceNum, eventDiceNum);
-
-        if(GameManager.instance.state > GameState.Friendly)
+        if (GameManager.instance.state > GameState.Friendly)
         {
-            if(eventDiceNum <3)
+            if (eventDiceNum < 3)
                 barbarians.photonView.RPC("Advance", RpcTarget.AllBufferedViaServer, score);
             else
-                SendNumber(score);
+                Utils.RaiseEventForAll(RaiseEventsCode.DeserveDevelopmentCard, new object[] { eventDiceNum, redDiceNum + 1 });
         }
         else
             SendNumber(score);
-
 
     }
 
@@ -220,16 +223,15 @@ public class Dice : MonoBehaviourPun
     [PunRPC]
     public void SetDice(int yellowDice, int redDice, int eventDice)
     {
-        this.yellowDice.localRotation = Quaternion.Euler(quats[yellowDice]);
-        this.redDice.localRotation = Quaternion.Euler(quats[redDice]);
-        this.eventDice.localRotation = Quaternion.Euler(quats[eventDice]);
+        this.yellowDice.localRotation = Quaternion.Euler(Consts.Quats[yellowDice]);
+        this.redDice.localRotation = Quaternion.Euler(Consts.Quats[redDice]);
+        this.eventDice.localRotation = Quaternion.Euler(Consts.Quats[eventDice]);
     }
 
     [PunRPC]
     public void Init(int barbariansID)
     {
         playerSetup = PlayerSetup.LocalPlayerInstance.GetComponent<PlayerSetup>();
-        cardManager = PlayerSetup.LocalPlayerInstance.GetComponent<CardManager>();
         turnManager = PlayerSetup.LocalPlayerInstance.GetComponent<TurnManager>();
 
         transform.SetParent(playerSetup.canvas.transform);

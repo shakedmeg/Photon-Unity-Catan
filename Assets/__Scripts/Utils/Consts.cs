@@ -12,13 +12,19 @@ public enum eResources { Brick, Ore, Wheat, Wood, Wool, Desert = 100};
 public enum eCommodity { None, Coin=5, Paper, Silk };
 public enum eKnightActions { None, TakeAction, Move, MoveRobber, MoveKnight};
 public enum GameState { SetupSettlement, SetupCity, Friendly, PreAttack, Playing };
-public enum eCardsState { None, Throw, Trade, Robber};
+public enum eCardsState { None, Throw, Trade, Give, Exchange, Take };
 
 public enum ePorts { p2To1=2, p3To1, p4To1 };
 
 public enum eResponses { None, True, False };
 
 public enum eLongestRoadState { Game, Tie, Player}
+
+public enum eDevelopmentCardsTypes { Alchemist, Crane, Engineer, Inventor, Irrigation, Medicine, Mining, RoadBuilding, Smith,
+                                     Bishop, Deserter, Diplomat, Intrigue, Saboteur, Spy, Warlord, Wedding,
+                                     CommercialHarbor, MasterMerchant, Merchant, MerchantFleet, ResourceMonopoly, TradeMonopoly,
+                                     Printer, Constitution, None,
+}
 
 public enum RaiseEventsCode
 {
@@ -28,12 +34,18 @@ public enum RaiseEventsCode
     CheckImporveCity,
     ActivateRobber,
     SetLongestRoad,
+    UpdatePointsForAll,
+    GiveDevelopmentCard,
+    ReturnDevelopmentCard,
+    ReturnDevelopmentCardAfterUsage,
+    FinishDevelopmentCardRollHandout,
+    WinDevelopmentCard,
 
 
 
 
     // BuildManager
-    SendMapData,
+    SendMapData,            // TurnManager, CardManager, GameManager
     PreSetupSettlement,
     PreSetupCity,
     MatchTilesToDice,
@@ -53,6 +65,11 @@ public enum RaiseEventsCode
     CheckIfNeedToPick,
     DeactivateAllKnights,
     CheckRoads,
+    ChooseKnightToLose,
+    BuildDesertedKnight,
+    LoseRoad,
+    RemoveRoad,
+    SwitchProbs,
 
 
     // TurnManager
@@ -69,9 +86,31 @@ public enum RaiseEventsCode
     CompleteTrade,
     AddCachedCards,
     PickCard,
+    Sabotage,
+    CountDevCards,
+    DevCardsCount,
+    Spy,
+    Wedding,
+    CommercialHarbor,
+    CountCommodities,   // this one will count them
+    CommoditiesCount,   // this one will return the amout to the player
+    CompleteCommercialHarborExchange,
+    MasterMerchant,
+    CountCards,
+    CardsCount,
+    CompleteMasterMerchant,
+    LoseMerchant,
+    ResourceMonopoly,
+    TradeMonopoly,
+    DeserveDevelopmentCard,
+    SendDevelopmentCardFromRoll,
+    SendDevelopmentCardFromWin,
+    ChooseDevelopmentCard,
 
     // City
     LoseImproveCity,
+
+
 
     // Dice
     AddGreenPlayer,
@@ -79,10 +118,40 @@ public enum RaiseEventsCode
     FinishPickCard,
     SendDiceScore,
 
+    // Barbarians
+    FinishDevelopmentCardWinHandout,
+
+    // Diplomat
+    FinishDiplomat,
+
+    // Intrigue
+    FinishIntrigue,
+
+    // Sabotague
+    FinishSabotuer,
+
+    // Wedding
+    FinishWedding,
+
+    // CommercialHarbor
+    FinishCommercialHarbor,
+
+    // MasterMerchant
+    FinishMasterMerchant,
+
+    // ResourceMonopoly
+    FinishResourceMonopoly,
+
+    // TradeMonopoly
+    FinishTradeMonopoly,
 
     // PlayerSetup
     SetPlayerPanel,
     AddPoints,
+    SetDevelopmentCard,
+    SetDisplayCard,
+    ActivateSpyPanel,
+    ActivateLongestRoad,
     GameOver,
 
 
@@ -99,6 +168,7 @@ public class Consts
     public static Vector3 PROB_LOCAL_POSITION { get; } = new Vector3(0, 0, -2);
 
     public static Vector3 RobberLocalPosition { get; } = new Vector3(-2.7f, 0.15f, 0);
+    public static Vector3 MerchantLocalPosition { get; } = new Vector3(0f, 1.6f, 2.7f);
 
     public static Dictionary<eResources, Color32> TILE_COLOR { get; } = new Dictionary<eResources, Color32>()
         {{eResources.Brick, new Color32(255, 47, 0, 255)},
@@ -112,9 +182,17 @@ public class Consts
     public const string PaperDevelopment = "PaperDevelopment";
     public const string SilkDevelopment = "SilkDevelopment";
 
-    public static Color32 CoinDevelopmentColor { get; } = new Color32(1, 39, 255,255);
+
+    
+    //public static Color32 CoinDevelopmentColor { get; } = new Color32(125, 197, 217,255);
+    public static Color32 CoinDevelopmentColor { get; } = new Color32(6, 140, 251,255);
     public static Color32 PaperDevelopmentColor { get; } = new Color32(54, 166, 0,255);
-    public static Color32 SilkDevelopmentColor { get; } = new Color32(255, 250, 8,255);
+    public static Color32 SilkDevelopmentColor { get; } = new Color32(231, 208, 10,255);
+    //public static Color32 SilkDevelopmentColor { get; } = new Color32(250, 224, 103,255);
+
+    public static List<Vector3> Quats { get; } = new List<Vector3>() {
+        new Vector3(90, 0 , 0), new Vector3(0, 90, 0), new Vector3(0, 0, 0), new Vector3(180, 0, 0), new Vector3(0, 270, 0), new Vector3(270, 0, 0)
+    };
 
     #endregion
 
@@ -187,16 +265,21 @@ public class Consts
 
     public const float ScaleTime = 0.4f;
 
-    public static Vector3 ScaleKnight { get; } = new Vector3(1.2f, 1.7f, 1.2f);
-    public static Vector3 ScaleKnight3 { get; } = new Vector3(1.4f, 1.7f, 1.2f);
-
     public static Vector3 KnightRegularScale { get; } = new Vector3(1f, 1.5f, 1f);
     public static Vector3 Knight3RegularScale { get; } = new Vector3(1.2f, 1.5f, 1f);
+
+    public static Vector3 ScaleKnight { get; } = new Vector3(1.5f, 2f, 1.5f);
+    public static Vector3 ScaleKnight3 { get; } = new Vector3(1.7f, 2f, 1.5f);
+
 
 
     public static Vector3 RobberRegularScale { get; } = new Vector3(0.173f, 0.2f, 2f);
     public static Vector3 ScaleRobber { get; } = new Vector3(0.2f, 0.25f, 2.2f);
-    
+
+    public static Vector3 MerchantRegularScale { get; } = new Vector3(0.173f, 0.2f, 30f);
+
+    public static Vector3 RoadRegularScale { get; } = new Vector3(1, 1, 3);
+    public static Vector3 ScaleRoad { get; } = new Vector3(2, 1.1f, 5);
     public static Vector3 SettlementRegularScale { get; } = Vector3.one;
     public static Vector3 ScaleSettlement { get; } = new Vector3(1.4f, 1.4f, 1.4f);    
     public static Vector3 CityRegularScale { get; } = new Vector3(1f, 1f, 1.25f);
@@ -246,9 +329,9 @@ public class Consts
 
     #endregion
 
-
     #region Resources Folder Paths
     public const string CardsPath = "Cards/";
+    public const string DisplayCardsPath = "Development Cards/Backgrounds And Points/";
     #endregion
 
     #region Offer Panel
@@ -269,6 +352,7 @@ public class Consts
 
     public const string p2to1 = "2 : 1";
     public const string p3to1 = "3 : 1";
+    public const string p4to1 = "4 : 1";
 
     public const string PortsFolder = "Ports/";
 
@@ -279,7 +363,53 @@ public class Consts
     public const string Good = "Green";
     public const string Bad = "Bad";
     public const string LoseCity = "LoseCity";
+    public const string LoseKnight = "LoseKnight";
+    public const string DisplaceKnightIntrigue = "DisplaceKnightIntrigue";
+    public const string DisplaceKnight = "DisplaceKnight";
+    public const string Saboteur = "Saboteur";
+    public const string Wedding = "Wedding";
+    public const string CommercialHarbor = "CommercialHarbor";
+    public const string MasterMerchantTaker = "MasterMerchantTaker";
+    public const string MasterMerchantVictim = "MasterMerchantVictim";
+    public const string Spy = "Spy";
+    public const string SpyVictim = "SpyVictim";
+    public const string ChooseDevCard = "Choosing Development Card";
+    public const string ThrowDevCard = "Throwing Development Card";
+
     public const string Default = "Default";
+
+
+    #endregion
+
+
+    #region Development Cards
+    public static Dictionary<eDevelopmentCardsTypes, string> DevelopmentCardsDesc { get; } = new Dictionary<eDevelopmentCardsTypes, string>()
+    {
+        { eDevelopmentCardsTypes.Alchemist, "This is the only progress card you can play before you roll the dice. It allows you to choose the results of both production dice. Then, roll the event die as normal and resolve the event." },
+        { eDevelopmentCardsTypes.Crane, "You can build a city improvement (abbey, town hall, etc). for 1 commodity less than normal."},
+        { eDevelopmentCardsTypes.Engineer, "You may build one city wall for free."},
+        { eDevelopmentCardsTypes.Inventor, "Switch two number tokens of your choice, but not 2, 12, 6, or 8."},
+        { eDevelopmentCardsTypes.Irrigation, "Collect 2 grain cards for each fields hex adjacent to at least one of your settlements or cities."},
+        { eDevelopmentCardsTypes.Medicine, "You may upgrade a settlement to a city for 2 ore and 1 grain. When you play this card, you save 1 ore and 1 grain. You may not combine two of these cards for the same city."},
+        { eDevelopmentCardsTypes.Mining, "Collect 2 ore cards for each mountains hex adjacent to at least one of your settlements or cities."},
+        { eDevelopmentCardsTypes.RoadBuilding, "This card allows you to build 2 roads for free."},
+        { eDevelopmentCardsTypes.Smith, "You may promote 2 of your knights 1 level each for free."},
+        { eDevelopmentCardsTypes.Bishop, "Move the robber, following the normal rules. Draw 1 random resource/commodity card from each player who has a settlement or city next to the robber's new hex."},
+        { eDevelopmentCardsTypes.Deserter, "Choose an opponent. He must remove 1 of his knights (his choice) from the board. You may then place 1 of your own knights, on the board. Its strength must equal to the knight removed (the normal rules for placing knights apply)."},
+        { eDevelopmentCardsTypes.Diplomat, "You may remove an \"open\" road (without another road or other piece at one end). If you remove your own road, you may immediately place it somewhere else on the island (following all the normal building rules) for free."},
+        { eDevelopmentCardsTypes.Intrigue, "You may displace an opponent’s knight. Theknight must be on an intersection connected to at least one of your roads."},
+        { eDevelopmentCardsTypes.Saboteur, "When you play this card, each player who has as many or more victory points than you must discard half (round down) of his cards to the bank (resource and/or commodity cards)."},
+        { eDevelopmentCardsTypes.Spy, "Look at another player's hand of progress cards. You may choose 1 card to take and add to your hand."},
+        { eDevelopmentCardsTypes.Warlord, "You may activate all of your knights for free."},
+        { eDevelopmentCardsTypes.Wedding, "Each of your opponents who has more victory points than you must give you 2 resource/commodity cards of his choice."},
+        { eDevelopmentCardsTypes.CommercialHarbor, "You may force each of the other players to make a special trade. You may offer each opponent any 1 resource card from your hand. He must exchange it for any 1 commodity card of his choice from his hand, if he has any."},
+        { eDevelopmentCardsTypes.MasterMerchant, "Choose another player who has more victory points than you do. Look at the player's hand of resource and commodity cards and choose 2 cards to take and add to your hand."},
+        { eDevelopmentCardsTypes.Merchant, "Place the Merchant on any land hex next to 1 of your settlements or cities. You may exchange the resources produced by this type of hex with the supply at a 2:1 rate, as long as the merchant remains on that hex."},
+        { eDevelopmentCardsTypes.MerchantFleet, "You may use one resource or commodity of your choice to make any number of 2:1 trades with the supply during the turn that you play this card."},
+        { eDevelopmentCardsTypes.ResourceMonopoly, "Name a resource. Each player must give you 2 of that type of resource if they have them."},
+        { eDevelopmentCardsTypes.TradeMonopoly, "Name a commodity. Each player must give you 1 commodity of that type if they have them."},
+    };
+
 
 
     #endregion
